@@ -1,0 +1,12 @@
+# Copias locales de datos (no versionar: contienen saldos reales)
+*.xlsx
+*.xls
+*.csv
+*.json
+backup*/
+_archivo/
+
+# Sistema
+.DS_Store
+Thumbs.db
+desktop.ini

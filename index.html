@@ -1,0 +1,2942 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cartera de Inversiones - SBS Dashboard & Benchmarks</title>
+  
+  <!-- Fonts & Icons -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/hammer.js/2.0.8/hammer.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2.0.1/dist/chartjs-plugin-zoom.min.js"></script>
+
+  <style>
+    :root {
+      /* Tema Claro / Executive Light Slate */
+      --bg-main: #f1f5f9;
+      --bg-card: #ffffff;
+      --bg-card-hover: #f8fafc;
+      --bg-input: #ffffff;
+      --border-color: #e2e8f0;
+      --border-focus: #4f46e5;
+      
+      --text-main: #0f172a;
+      --text-muted: #475569;
+      --text-sub: #64748b;
+
+      --primary: #4f46e5;
+      --primary-hover: #4338ca;
+      --accent-msci: #d97706;
+      --accent-sp500: #db2777;
+      --accent-real: #0284c7;
+      --success: #10b981;
+      --danger: #ef4444;
+      --warning: #f59e0b;
+
+      --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.05), 0 1px 2px rgba(0, 0, 0, 0.03);
+      --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.06), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+      --shadow-lg: 0 10px 25px -5px rgba(0, 0, 0, 0.1);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: 'Outfit', sans-serif;
+      background-color: var(--bg-main);
+      color: var(--text-main);
+      min-height: 100vh;
+      line-height: 1.5;
+      padding-bottom: 60px;
+    }
+
+    body.privacy-mode .kpi-value,
+    body.privacy-mode #historyTableBody td:nth-child(2),
+    body.privacy-mode #historyTableBody td:nth-child(3),
+    body.privacy-mode #historyTableBody td:nth-child(4),
+    body.privacy-mode #historyTableBody td:nth-child(5),
+    body.privacy-mode #historyTableBody td:nth-child(7),
+    body.privacy-mode #historyTableBody td:nth-child(9),
+    body.privacy-mode #allocationTableBody td:nth-child(2),
+    body.privacy-mode #annualStatsTableBody td:nth-child(2) {
+      filter: blur(6px);
+      user-select: none;
+      transition: filter 0.2s ease;
+    }
+
+    /* Layout Containers */
+    .container {
+      max-width: 1400px;
+      margin: 0 auto;
+      padding: 24px 20px;
+    }
+
+    /* Header */
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding-bottom: 20px;
+      border-bottom: 1px solid var(--border-color);
+      margin-bottom: 24px;
+      flex-wrap: wrap;
+      gap: 16px;
+      background: var(--bg-card);
+      padding: 20px 24px;
+      border-radius: 16px;
+      box-shadow: var(--shadow-sm);
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+
+    .brand-icon {
+      width: 44px;
+      height: 44px;
+      background: linear-gradient(135deg, var(--primary), var(--accent-sp500));
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 20px;
+      color: white;
+      box-shadow: 0 4px 12px rgba(79, 70, 229, 0.25);
+    }
+
+    .brand-title h1 {
+      font-size: 1.45rem;
+      font-weight: 700;
+      color: var(--text-main);
+    }
+
+    .brand-title p {
+      font-size: 0.85rem;
+      color: var(--text-muted);
+    }
+
+    .header-actions {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+
+    /* Buttons */
+    .btn {
+      padding: 9px 16px;
+      border-radius: 8px;
+      font-weight: 600;
+      font-size: 0.88rem;
+      cursor: pointer;
+      border: 1px solid transparent;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      transition: all 0.2s ease;
+      font-family: inherit;
+    }
+
+    .btn-primary {
+      background: var(--primary);
+      color: white;
+    }
+
+    .btn-primary:hover {
+      background: var(--primary-hover);
+      transform: translateY(-1px);
+    }
+
+    .btn-cloud {
+      background: #0284c7;
+      color: white;
+    }
+
+    .btn-cloud:hover {
+      background: #0369a1;
+      transform: translateY(-1px);
+    }
+
+    .btn-secondary {
+      background: #f1f5f9;
+      color: var(--text-main);
+      border-color: #cbd5e1;
+    }
+
+    .btn-secondary:hover {
+      background: #e2e8f0;
+    }
+
+    .btn-danger {
+      background: #fef2f2;
+      color: #dc2626;
+      border-color: #fecaca;
+    }
+
+    .btn-danger:hover {
+      background: #fee2e2;
+    }
+
+    /* Time Filter Bar */
+    .filter-bar {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: 14px;
+      padding: 14px 20px;
+      margin-bottom: 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 16px;
+      box-shadow: var(--shadow-sm);
+    }
+
+    .filter-title {
+      font-size: 0.88rem;
+      font-weight: 600;
+      color: var(--text-muted);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .filter-pills {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .pill-btn {
+      padding: 6px 14px;
+      border-radius: 20px;
+      border: 1px solid var(--border-color);
+      background: #f8fafc;
+      color: var(--text-muted);
+      font-size: 0.82rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .pill-btn.active {
+      background: var(--primary);
+      color: white;
+      border-color: var(--primary);
+    }
+
+    .date-range-group {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 0.85rem;
+      color: var(--text-muted);
+    }
+
+    .date-range-group input {
+      padding: 5px 10px;
+      border: 1px solid var(--border-color);
+      border-radius: 6px;
+      font-family: inherit;
+      font-size: 0.85rem;
+      background: var(--bg-input);
+      color: var(--text-main);
+    }
+
+    /* KPI Grid */
+    .kpi-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 18px;
+      margin-bottom: 28px;
+    }
+
+    .kpi-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: 14px;
+      padding: 20px;
+      position: relative;
+      overflow: hidden;
+      box-shadow: var(--shadow-sm);
+    }
+
+    .kpi-card::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 4px;
+      height: 100%;
+      background: var(--card-accent, var(--primary));
+    }
+
+    .kpi-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 10px;
+    }
+
+    .kpi-title {
+      font-size: 0.82rem;
+      color: var(--text-muted);
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .kpi-icon {
+      font-size: 1.1rem;
+      color: var(--card-accent, var(--primary));
+    }
+
+    .kpi-value {
+      font-size: 1.75rem;
+      font-weight: 700;
+      color: var(--text-main);
+      margin-bottom: 6px;
+    }
+
+    .kpi-sub {
+      font-size: 0.85rem;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .badge {
+      padding: 2px 8px;
+      border-radius: 6px;
+      font-size: 0.78rem;
+      font-weight: 600;
+    }
+
+    .badge-success { background: #dcfce7; color: #15803d; }
+    .badge-danger { background: #fee2e2; color: #b91c1c; }
+    .badge-neutral { background: #f1f5f9; color: #475569; }
+
+    /* Tabs */
+    .tabs-nav {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 24px;
+      border-bottom: 1px solid var(--border-color);
+      padding-bottom: 12px;
+      flex-wrap: wrap;
+    }
+
+    .tab-btn {
+      padding: 10px 18px;
+      background: transparent;
+      border: none;
+      color: var(--text-muted);
+      font-weight: 600;
+      font-size: 0.92rem;
+      cursor: pointer;
+      border-radius: 8px;
+      transition: all 0.2s ease;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-family: inherit;
+    }
+
+    .tab-btn.active {
+      background: var(--bg-card);
+      color: var(--primary);
+      border: 1px solid var(--border-color);
+      box-shadow: var(--shadow-sm);
+    }
+
+    .tab-btn:hover:not(.active) {
+      color: var(--text-main);
+      background: rgba(255, 255, 255, 0.5);
+    }
+
+    .tab-content {
+      display: none;
+    }
+
+    .tab-content.active {
+      display: block;
+    }
+
+    /* Charts Section */
+    .charts-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(580px, 1fr));
+      gap: 24px;
+      margin-bottom: 28px;
+    }
+
+    @media (max-width: 768px) {
+      .charts-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .chart-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: 14px;
+      padding: 22px;
+      box-shadow: var(--shadow-sm);
+    }
+
+    .chart-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 18px;
+    }
+
+    .chart-title h3 {
+      font-size: 1.05rem;
+      font-weight: 600;
+    }
+
+    .chart-title p {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+    }
+
+    .chart-container {
+      position: relative;
+      height: 340px;
+      width: 100%;
+    }
+
+    /* Asset Allocation Grid */
+    .allocation-charts-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
+      gap: 24px;
+      margin-bottom: 24px;
+    }
+
+    .allocation-container {
+      display: grid;
+      grid-template-columns: 380px 1fr;
+      gap: 24px;
+    }
+
+    @media (max-width: 1024px) {
+      .allocation-container {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    /* Tables */
+    .table-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: 14px;
+      padding: 22px;
+      overflow: hidden;
+      box-shadow: var(--shadow-sm);
+    }
+
+    .table-wrapper {
+      overflow-x: auto;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      text-align: left;
+      font-size: 0.88rem;
+    }
+
+    th {
+      background: #f8fafc;
+      padding: 12px 14px;
+      color: var(--text-muted);
+      font-weight: 600;
+      font-size: 0.78rem;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      border-bottom: 1px solid var(--border-color);
+      white-space: nowrap;
+    }
+
+    td {
+      padding: 13px 14px;
+      border-bottom: 1px solid var(--border-color);
+      color: var(--text-main);
+      white-space: nowrap;
+    }
+
+    tr:hover td {
+      background: #f8fafc;
+    }
+
+    .progress-bar-bg {
+      height: 6px;
+      background: #e2e8f0;
+      border-radius: 3px;
+      overflow: hidden;
+      width: 80px;
+      display: inline-block;
+      vertical-align: middle;
+      margin-left: 8px;
+    }
+
+    .progress-bar-fill {
+      height: 100%;
+      border-radius: 3px;
+      background: var(--primary);
+    }
+
+    /* Rebalance Card */
+    .rebalance-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: 14px;
+      padding: 22px;
+      margin-bottom: 24px;
+      box-shadow: var(--shadow-sm);
+    }
+
+    /* Help / Guide Cards */
+    .guide-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: 14px;
+      padding: 24px;
+      margin-bottom: 18px;
+      box-shadow: var(--shadow-sm);
+    }
+
+    .guide-card h3 {
+      font-size: 1.1rem;
+      font-weight: 700;
+      color: var(--primary);
+      margin-bottom: 10px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .guide-card p, .guide-card ul {
+      color: var(--text-muted);
+      font-size: 0.92rem;
+      line-height: 1.6;
+    }
+
+    .guide-card ul {
+      padding-left: 20px;
+      margin-top: 8px;
+    }
+
+    .guide-card li {
+      margin-bottom: 6px;
+    }
+
+    /* Modal Form */
+    .modal-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(15, 23, 42, 0.5);
+      backdrop-filter: blur(4px);
+      display: none;
+      justify-content: center;
+      align-items: center;
+      z-index: 1000;
+      padding: 20px;
+    }
+
+    .modal-overlay.active {
+      display: flex;
+    }
+
+    .modal-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: 16px;
+      max-width: 800px;
+      width: 100%;
+      max-height: 90vh;
+      overflow-y: auto;
+      box-shadow: var(--shadow-lg);
+    }
+
+    .modal-header {
+      padding: 18px 24px;
+      border-bottom: 1px solid var(--border-color);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      position: sticky;
+      top: 0;
+      background: var(--bg-card);
+      z-index: 10;
+    }
+
+    .modal-header h3 {
+      font-size: 1.15rem;
+      font-weight: 700;
+    }
+
+    .close-btn {
+      background: none;
+      border: none;
+      color: var(--text-muted);
+      font-size: 1.3rem;
+      cursor: pointer;
+    }
+
+    .modal-body {
+      padding: 24px;
+    }
+
+    .form-section-title {
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: var(--primary);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 14px;
+      padding-bottom: 6px;
+      border-bottom: 1px solid var(--border-color);
+    }
+
+    .form-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 16px;
+      margin-bottom: 24px;
+    }
+
+    .form-group {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .form-group label {
+      font-size: 0.82rem;
+      color: var(--text-muted);
+      font-weight: 500;
+    }
+
+    .form-control {
+      background: var(--bg-input);
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      padding: 9px 12px;
+      color: var(--text-main);
+      font-family: inherit;
+      font-size: 0.92rem;
+      transition: border-color 0.2s;
+    }
+
+    .form-control:focus {
+      outline: none;
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.15);
+    }
+
+    .modal-footer {
+      padding: 16px 24px;
+      border-top: 1px solid var(--border-color);
+      display: flex;
+      justify-content: flex-end;
+      gap: 12px;
+      background: var(--bg-card);
+      position: sticky;
+      bottom: 0;
+    }
+
+    /* Utilities */
+    .text-success { color: #16a34a !important; }
+    .text-danger { color: #dc2626 !important; }
+    .text-warning { color: #d97706 !important; }
+    .text-muted { color: var(--text-muted) !important; }
+    .text-bold { font-weight: 700; }
+
+    .chart-card.fullscreen {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      z-index: 99999;
+      margin: 0;
+      border-radius: 0;
+      display: flex;
+      flex-direction: column;
+      padding: 24px;
+      overflow: hidden;
+    }
+    .chart-card.fullscreen .chart-container {
+      flex: 1;
+      height: auto !important;
+    }
+    .chart-card.fullscreen canvas {
+      cursor: grab;
+    }
+    .chart-card.fullscreen canvas:active {
+      cursor: grabbing;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="container">
+    <!-- Header -->
+    <header>
+      <div class="brand">
+        <div class="brand-icon">
+          <i class="fa-solid fa-chart-line"></i>
+        </div>
+        <div class="brand-title">
+          <h1>Cartera Inversiones</h1>
+          <p>Control de Fondos MyInvestor + Cripto & Acciones Trading 212 vs Benchmarks</p>
+        </div>
+      </div>
+      <div class="header-actions">
+        <button class="btn btn-primary" onclick="openAddModal()">
+          <i class="fa-solid fa-plus"></i> Añadir Registro
+        </button>
+        <button class="btn btn-cloud" id="toggleCloudBtn" onclick="toggleCloudSync()">
+          <i class="fa-solid fa-cloud"></i> Nube: ACTIVA
+        </button>
+        <button class="btn btn-cloud" style="background: #0ea5e9;" onclick="forceSyncCloud()">
+          <i class="fa-solid fa-rotate"></i> Forzar Recarga
+        </button>
+        <button class="btn btn-secondary" onclick="openPinModal()">
+          <i class="fa-solid fa-lock"></i> Seguridad PIN
+        </button>
+        <button class="btn btn-secondary" id="privacyToggleBtn" onclick="togglePrivacyMode()" title="Ocultar o Mostrar saldos en pantalla">
+          <i class="fa-solid fa-eye-slash"></i> Ocultar Saldos
+        </button>
+        <button class="btn btn-secondary" onclick="exportJSON()">
+          <i class="fa-solid fa-download"></i> Backup (JSON)
+        </button>
+        <button class="btn btn-secondary" onclick="exportCSV()">
+          <i class="fa-solid fa-file-excel"></i> Exportar CSV
+        </button>
+        <button class="btn btn-secondary" onclick="triggerImport()">
+          <i class="fa-solid fa-upload"></i> Cargar Backup
+        </button>
+        <input type="file" id="importFile" accept=".json" style="display:none;" onchange="importJSON(event)">
+      </div>
+    </header>
+
+    <!-- Time Filter Bar -->
+    <div class="filter-bar">
+      <div class="filter-title">
+        <i class="fa-solid fa-calendar-days"></i> Rango Temporal:
+        <span id="cloudStatusBadge" class="badge badge-neutral" style="margin-left: 8px;">⚪ Guardado Local</span>
+        <span id="pinStatusBadge" class="badge badge-neutral" style="margin-left: 4px;">🔓 Sin PIN</span>
+        <button class="pill-btn" onclick="downloadCloudBackup()" title="Descargar a tu disco el JSON cifrado">⬇ Copia</button>
+        <button class="pill-btn" onclick="document.getElementById('restoreFile').click()" title="Restaurar una copia cifrada">⬆ Restaurar</button>
+        <input type="file" id="restoreFile" accept="application/json,.json" style="display: none;" onchange="restoreCloudBackup(this)">
+      </div>
+            <div class="filter-pills">
+        <button class="pill-btn active" id="filterAll" onclick="setPeriodFilter('ALL', this)">Todo</button>
+        <button class="pill-btn" id="filter1Y" onclick="setPeriodFilter('1Y', this)">1 Año</button>
+        <button class="pill-btn" id="filterYTD" onclick="setPeriodFilter('YTD', this)">YTD</button>
+        <button class="pill-btn" id="filter6M" onclick="setPeriodFilter('6M', this)">6 Meses</button>
+        <button class="pill-btn" id="filter3M" onclick="setPeriodFilter('3M', this)">3 Meses</button>
+        <button class="pill-btn" id="filter1M" onclick="setPeriodFilter('1M', this)">1 Mes</button>
+        <button class="pill-btn" id="filter1W" onclick="setPeriodFilter('1W', this)">1 Sem.</button>
+        <button class="pill-btn" id="filter1D" onclick="setPeriodFilter('1D', this)">Día</button>
+      </div>
+      <div class="date-range-group">
+        <label for="filterStartDate">Desde:</label>
+        <input type="date" id="filterStartDate" onchange="applyCustomDateFilter()">
+        <label for="filterEndDate">Hasta:</label>
+        <input type="date" id="filterEndDate" onchange="applyCustomDateFilter()">
+      </div>
+    </div>
+
+    <!-- KPI Grid -->
+    <div class="kpi-grid">
+      <!-- Patrimonio Total Combinado -->
+      <div class="kpi-card" style="--card-accent: #4f46e5;">
+        <div class="kpi-header">
+          <span class="kpi-title">Patrimonio Total</span>
+          <i class="fa-solid fa-vault kpi-icon"></i>
+        </div>
+        <div class="kpi-value" id="kpiWealthVal">0.00 €</div>
+        <div class="kpi-sub">
+          <span class="badge" id="kpiWealthBadge">0.00%</span>
+          <span class="text-muted" id="kpiWealthGain">0.00 € ganancia</span>
+        </div>
+      </div>
+
+      <!-- Cartera MyInvestor + Cripto -->
+      <div class="kpi-card" style="--card-accent: var(--accent-real);">
+        <div class="kpi-header">
+          <span class="kpi-title">MyInvestor + Cripto</span>
+          <i class="fa-solid fa-wallet kpi-icon"></i>
+        </div>
+        <div class="kpi-value" id="kpiRealVal">0.00 €</div>
+        <div class="kpi-sub">
+          <span class="badge" id="kpiRealBadge">0.00%</span>
+          <span class="text-muted" id="kpiRealGain">0.00 € ganancia</span>
+        </div>
+      </div>
+
+      <!-- Cartera Acciones Trading 212 -->
+      <div class="kpi-card" style="--card-accent: #8b5cf6;">
+        <div class="kpi-header">
+          <span class="kpi-title">Acciones Trading 212</span>
+          <i class="fa-solid fa-chart-pie kpi-icon"></i>
+        </div>
+        <div class="kpi-value" id="kpiStockVal">0.00 €</div>
+        <div class="kpi-sub">
+          <span class="badge" id="kpiStockBadge">0.00%</span>
+          <span class="text-muted" id="kpiStockGain">0.00 € ganancia</span>
+        </div>
+      </div>
+
+      <!-- Alpha vs Benchmarks -->
+      <div class="kpi-card" style="--card-accent: #10b981;">
+        <div class="kpi-header">
+          <span class="kpi-title">Alpha vs Mercado</span>
+          <i class="fa-solid fa-trophy kpi-icon"></i>
+        </div>
+        <div class="kpi-value" id="kpiAlphaMsciVal">+0.00%</div>
+        <div class="kpi-sub">
+          <span class="badge" id="kpiAlphaBadge">vs MSCI World</span>
+          <span class="text-muted" id="kpiAlphaSp500Val">vs S&P 500: +0.00%</span>
+        </div>
+      </div>
+
+      <!-- Total Invertido -->
+      <div class="kpi-card" style="--card-accent: var(--text-muted);">
+        <div class="kpi-header">
+          <span class="kpi-title">Aportado en Periodo</span>
+          <i class="fa-solid fa-piggy-bank kpi-icon"></i>
+        </div>
+        <div class="kpi-value" id="kpiInvestedVal">0.00 €</div>
+        <div class="kpi-sub">
+          <span class="text-muted" id="kpiMonthsCount">0 registros en rango</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Navigation Tabs -->
+    <div class="tabs-nav">
+      <button class="tab-btn active" onclick="switchTab('tab-charts', this)">
+        <i class="fa-solid fa-chart-area"></i> Gráficos Principales
+      </button>
+      <button class="tab-btn" onclick="switchTab('tab-allocation', this)">
+        <i class="fa-solid fa-pie-chart"></i> Reparto por Activo
+      </button>
+      <button class="tab-btn" onclick="switchTab('tab-rebalance', this)">
+        <i class="fa-solid fa-calculator"></i> Calculadora Rebalanceo
+      </button>
+      <button class="tab-btn" onclick="switchTab('tab-assets-config', this)">
+        <i class="fa-solid fa-sliders"></i> Gestionar Fondos & Activos
+      </button>
+      <button class="tab-btn" onclick="switchTab('tab-annual', this)">
+        <i class="fa-solid fa-calendar-check"></i> Estadísticas Anuales
+      </button>
+      <button class="tab-btn" onclick="switchTab('tab-history', this)">
+        <i class="fa-solid fa-table-list"></i> Historial de Registros
+      </button>
+      <button class="tab-btn" onclick="switchTab('tab-guide', this)">
+        <i class="fa-solid fa-circle-question"></i> Guía & Explicación
+      </button>
+    </div>
+
+    <!-- Tab 1: Charts -->
+    <div id="tab-charts" class="tab-content active">
+      <div class="charts-grid">
+
+        <!-- Chart 1: Evolución Patrimonial -->
+        <div class="chart-card" id="cardPatrimony">
+          <div class="chart-header">
+            <div class="chart-title">
+              <h3>Evolución Patrimonial (€)</h3>
+              <p>Valor real de tu cartera vs MSCI World, S&P 500 y metas teóricas 5%/9%</p>
+            </div>
+            <div style="display: flex; gap: 8px; align-items: center;">
+              <button class="btn btn-secondary" onclick="resetChartZoom('cardPatrimony')" title="Restablecer Zoom"><i class="fa-solid fa-rotate-left"></i> Restablecer</button>
+              <button class="btn btn-secondary" onclick="toggleFullscreen('cardPatrimony')"><i class="fa-solid fa-expand"></i> Ampliar</button>
+            </div>
+          </div>
+          <div class="chart-container">
+            <canvas id="chartPatrimony"></canvas>
+          </div>
+        </div>
+
+        <!-- Chart 2: Rentabilidad Acumulada -->
+        <div class="chart-card" id="cardReturn">
+          <div class="chart-header">
+            <div class="chart-title">
+              <h3>Rentabilidad Acumulada (%)</h3>
+              <p>Comparativa porcentual directa side-by-side</p>
+            </div>
+            <div style="display: flex; gap: 8px; align-items: center;">
+              <button class="btn btn-secondary" onclick="resetChartZoom('cardReturn')" title="Restablecer Zoom"><i class="fa-solid fa-rotate-left"></i> Restablecer</button>
+              <button class="btn btn-secondary" onclick="toggleFullscreen('cardReturn')"><i class="fa-solid fa-expand"></i> Ampliar</button>
+            </div>
+          </div>
+          <div class="chart-container">
+            <canvas id="chartReturn"></canvas>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tab 2: Allocation -->
+    <div id="tab-allocation" class="tab-content">
+      <div class="allocation-charts-grid">
+        <!-- Donut Chart 1: Los 3 Pilares -->
+        <div class="chart-card">
+          <div class="chart-header">
+            <div class="chart-title">
+              <h3>Macro-Asignación (3 Pilares)</h3>
+              <p>Reparto entre Fondos MyInvestor, Acciones T212 y Cripto</p>
+            </div>
+          </div>
+          <div class="chart-container" style="height: 310px;">
+            <canvas id="chartPillars"></canvas>
+          </div>
+        </div>
+
+        <!-- Donut Chart 2: Detalle Activos -->
+        <div class="chart-card">
+          <div class="chart-header">
+            <div class="chart-title">
+              <h3>Desglose Detallado</h3>
+              <p>Peso actual por fondo y activo individual</p>
+            </div>
+          </div>
+          <div class="chart-container" style="height: 310px;">
+            <canvas id="chartAllocation"></canvas>
+          </div>
+        </div>
+      </div>
+
+      <!-- Table Asset Breakdown -->
+      <div class="table-card" style="margin-top: 24px;">
+        <div class="chart-header">
+          <div class="chart-title">
+            <h3>Detalle Completo de Posiciones (Último Registro)</h3>
+            <p>Balance actual, peso real en el patrimonio total y desviación</p>
+          </div>
+        </div>
+        <div class="table-wrapper">
+          <table>
+            <thead>
+              <tr>
+                <th>Fondo / Activo / Cartera</th>
+                <th>Obj (%)</th>
+                <th>Valor Actual (€)</th>
+                <th>Peso Real (%)</th>
+                <th>Desviación</th>
+              </tr>
+            </thead>
+            <tbody id="assetBreakdownBody">
+              <!-- Dynamic -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tab 3: Rebalance Calculator -->
+    <div id="tab-rebalance" class="tab-content">
+      <div class="rebalance-card">
+        <div class="chart-header">
+          <div class="chart-title">
+            <h3>Calculadora de Rebalanceo Óptimo</h3>
+            <p>Distribuye tu próxima aportación para acercar tu cartera al objetivo</p>
+          </div>
+        </div>
+        <div style="display: flex; gap: 16px; align-items: flex-end; margin-bottom: 20px; flex-wrap: wrap;">
+          <div class="form-group" style="width: 250px;">
+            <label for="nextAportInput">Próxima Aportación (€)</label>
+            <input type="number" id="nextAportInput" class="form-control" value="300" step="10" oninput="calculateRebalance()">
+          </div>
+          <button class="btn btn-primary" onclick="calculateRebalance()"><i class="fa-solid fa-rotate"></i> Recalcular</button>
+        </div>
+
+        <div class="table-wrapper">
+          <table>
+            <thead>
+              <tr>
+                <th>Fondo / Activo</th>
+                <th>Objetivo (%)</th>
+                <th>Valor Actual (€)</th>
+                <th>Peso Actual (%)</th>
+                <th>Sugerencia de Compra (€)</th>
+                <th>Peso Resultante (%)</th>
+              </tr>
+            </thead>
+            <tbody id="rebalanceTableBody">
+              <!-- Dynamic -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tab 4: Assets Config (Añadir/Quitar activos) -->
+    <div id="tab-assets-config" class="tab-content">
+      <div class="table-card">
+        <div class="chart-header">
+          <div class="chart-title">
+            <h3>Gestión de Fondos y Pesos Objetivos</h3>
+            <p>Añade, modifica o elimina fondos de tu lista de seguimiento</p>
+          </div>
+          <button class="btn btn-primary" onclick="openAddAssetModal()">
+            <i class="fa-solid fa-plus"></i> Añadir Nuevo Fondo
+          </button>
+        </div>
+        <div class="table-wrapper">
+          <table>
+            <thead>
+              <tr>
+                <th>Nombre del Fondo / Activo</th>
+                <th>ISIN / Ticker</th>
+                <th>Peso Objetivo (%)</th>
+                <th>Acciones</th>
+              </tr>
+            </thead>
+            <tbody id="assetsConfigBody">
+              <!-- Dynamic -->
+            </tbody>
+            <tfoot>
+              <tr style="background: #f8fafc; font-weight: 700;">
+                <td colspan="2">TOTAL OBJETIVO:</td>
+                <td id="totalTargetWeightCell">100.0%</td>
+                <td></td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      </div>
+    </div>
+
+
+    <!-- Tab: Estadísticas Anuales -->
+    <div id="tab-annual" class="tab-content">
+      <div class="table-card">
+        <div class="chart-header">
+          <div class="chart-title">
+            <h3>Rentabilidad Neta por Año Natural</h3>
+            <p>Comparativa anual de tu cartera de fondos, cartera de acciones, patrimonio total y benchmarks.</p>
+          </div>
+        </div>
+        
+        <!-- Toggle Columns Toolbar -->
+        <div style="display: flex; gap: 15px; margin-bottom: 15px; padding: 10px; background: #f8fafc; border-radius: 8px; border: 1px solid var(--border-color); font-size: 0.9rem; flex-wrap: wrap;">
+          <label style="display: flex; align-items: center; gap: 5px; cursor: pointer;">
+            <input type="checkbox" checked onchange="toggleTableCol('col-fondos', this.checked)"> MyInvestor + Cripto
+          </label>
+          <label style="display: flex; align-items: center; gap: 5px; cursor: pointer;">
+            <input type="checkbox" checked onchange="toggleTableCol('col-acciones', this.checked)"> Acciones T212
+          </label>
+          <label style="display: flex; align-items: center; gap: 5px; cursor: pointer;">
+            <input type="checkbox" checked onchange="toggleTableCol('col-total', this.checked)"> Pat. Total
+          </label>
+          <label style="display: flex; align-items: center; gap: 5px; cursor: pointer;">
+            <input type="checkbox" checked onchange="toggleTableCol('col-msci', this.checked)"> MSCI World
+          </label>
+          <label style="display: flex; align-items: center; gap: 5px; cursor: pointer;">
+            <input type="checkbox" checked onchange="toggleTableCol('col-sp500', this.checked)"> S&P 500
+          </label>
+        </div>
+
+        <div class="table-wrapper">
+          <table id="annualStatsTable">
+            <thead>
+              <tr>
+                <th>Año</th>
+                <th>Aportado en Año</th>
+                <th class="col-fondos">Rent. MyInvestor + Cripto</th>
+                <th class="col-acciones">Rent. Acciones T212</th>
+                <th class="col-total">Rent. Pat. Total</th>
+                <th class="col-msci">Rent. MSCI World</th>
+                <th class="col-sp500">Rent. S&P 500</th>
+              </tr>
+            </thead>
+            <tbody id="annualStatsTableBody">
+              <!-- Dynamic -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tab 5: History Table -->
+    <div id="tab-history" class="tab-content">
+      <div class="table-card">
+        <div class="chart-header">
+          <div class="chart-title">
+            <h3>Registros Históricos (Cualquier Fecha)</h3>
+            <p>Aportaciones, posiciones, rentabilidad real y simulación de benchmarks</p>
+          </div>
+        </div>
+        <div class="table-wrapper">
+          <table>
+            <thead>
+              <tr>
+                <th>Fecha Exacta</th>
+                <th>Aportación (€)</th>
+                <th>Tot. Invertido (€)</th>
+                <th>Cartera Real (€)</th>
+                <th>Ganancia (€)</th>
+                <th>Rent. Cartera</th>
+                <th>Sim. MSCI (€)</th>
+                <th>Rent. MSCI</th>
+                <th>Sim. S&P500 (€)</th>
+                <th>Rent. S&P500</th>
+                <th>Acciones</th>
+              </tr>
+            </thead>
+            <tbody id="historyTableBody">
+              <!-- Dynamic -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tab 6: User Guide & Manual -->
+    <div id="tab-guide" class="tab-content">
+      <div class="guide-card">
+        <h3><i class="fa-solid fa-cloud"></i> 1. Sincronización Automática en la Nube</h3>
+        <p>Tus datos se guardan y sincronizan automáticamente entre tu móvil y ordenador de forma transparente:</p>
+        <ul>
+          <li>La opción <strong>☁️ Nube: ACTIVA</strong> en la parte superior indica que la sincronización está habilitada.</li>
+          <li>Cada vez que añades un registro o modificas tus fondos, los cambios se guardan instantáneamente en la base de datos y estarán disponibles al abrir la web en otro dispositivo.</li>
+        </ul>
+      </div>
+
+      <div class="guide-card">
+        <h3><i class="fa-solid fa-calendar-check"></i> 2. Registros en cualquier fecha y frecuencia flexible</h3>
+        <p>No estás restringido a meter un único dato a final de mes:</p>
+        <ul>
+          <li>Puedes añadir un punto el día 1, el 15, o **varias veces al mes** si haces aportaciones extraordinarias o rebalanceos.</li>
+          <li>La app calcula de forma matemática exacta los días transcurridos entre registros para que las curvas de metas (5% y 9% anual) y las simulación de los benchmarks (MSCI World y S&P 500) sigan siendo perfectas y continuas.</li>
+        </ul>
+      </div>
+
+      <div class="guide-card">
+        <h3><i class="fa-solid fa-globe"></i> 3. ¿Cómo funciona la comparativa contra MSCI World y S&P 500?</h3>
+        <p>Para medir si tu diversificación añade valor real respecto a simplemente comprar un índice global o estadounidense, la app utiliza una **cartera simétrica virtual**:</p>
+        <ul>
+          <li>Cada vez que realizas una aportación, esa cantidad exacta de euros simula comprar participaciones del **MSCI World** (al precio de tu Fondo iShares Dev World) y del **S&P 500** (al precio que introduces del S&P 500).</li>
+          <li>Así se compara la rentabilidad neta acumulada en igualdad de condiciones (*side-by-side*).</li>
+        </ul>
+      </div>
+
+      <div class="guide-card">
+        <h3><i class="fa-solid fa-calculator"></i> 4. Calculadora de Rebalanceo Inteligente</h3>
+        <p>En la pestaña **`Calculadora Rebalanceo`**, introduce los euros que vas a aportar este mes (por ejemplo, 300 €). La calculadora analizará qué fondos están más por debajo de su porcentaje objetivo y te sugerirá exactamente cuánto dinero asignar a cada uno para mantener tu cartera equilibrada sin realizar ventas.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal Form for Add / Edit Record (Exact Date) -->
+  <div class="modal-overlay" id="modalForm">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3 id="modalTitle">Añadir Registro (Cualquier Día)</h3>
+        <button class="close-btn" onclick="closeModal()">&times;</button>
+      </div>
+      <form id="recordForm" onsubmit="saveRecord(event)">
+        <div class="modal-body">
+          <input type="hidden" id="editIndex" value="-1">
+
+          <!-- Section 1: General -->
+          <div class="form-section-title">1. Fecha Exacta, Aportación & Precios Benchmark</div>
+          <div class="form-grid">
+            <div class="form-group">
+              <label for="inputDate">Fecha Exacta</label>
+              <input type="date" id="inputDate" class="form-control" required>
+            </div>
+            <div class="form-group">
+              <label for="inputAport">Aportación Nueva (€)</label>
+              <input type="number" step="0.01" id="inputAport" class="form-control" placeholder="Ej: 300.00" required>
+            </div>
+            <div class="form-group">
+              <label for="inputMsciNav">
+                Precio iShares Dev World 
+                <a href="https://www.finect.com/fondos-inversion/IE000ZYRH0Q7" target="_blank" title="Mirar en Finect" style="color: var(--primary); text-decoration: none; margin-left: 4px;"><i class="fa-solid fa-arrow-up-right-from-square"></i></a>
+              </label>
+              <input type="number" step="0.0001" id="inputMsciNav" class="form-control" placeholder="Ej: 12.25" required>
+            </div>
+            <div class="form-group">
+              <label for="inputSp500Nav">
+                Fidelity S&P 500 
+                <a href="https://www.finect.com/fondos-inversion/IE00BYX5MX67" target="_blank" title="Mirar en Finect" style="color: var(--primary); text-decoration: none; margin-left: 4px;"><i class="fa-solid fa-arrow-up-right-from-square"></i></a>
+              </label>
+              <input type="number" step="0.0001" id="inputSp500Nav" class="form-control" placeholder="Ej: 16.42" required>
+            </div>
+          </div>
+
+
+          <!-- Section 1.5: Cartera de Acciones -->
+          <div class="form-section-title">1.5. Cartera de Acciones Propias (Opcional)</div>
+          <div class="form-grid">
+            <div class="form-group">
+              <label for="inputStockAport">Dinero Añadido a Acciones (€)</label>
+              <input type="number" step="0.01" id="inputStockAport" class="form-control" placeholder="Ej: 150.00" value="0">
+            </div>
+            <div class="form-group">
+              <label for="inputStockTotal">Valor Total Cartera Acciones (€)</label>
+              <input type="number" step="0.01" id="inputStockTotal" class="form-control" placeholder="Ej: 1250.00" value="0">
+            </div>
+          </div>
+
+          <!-- Section 2: Asset Positions -->
+          <div class="form-section-title">2. Valor de Posición por Fondo / Activo (€)</div>
+          <div class="form-grid" id="dynamicAssetInputs">
+            <!-- Generated dynamically -->
+          </div>
+        </div>
+
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancelar</button>
+          <button type="submit" class="btn btn-primary"><i class="fa-solid fa-save"></i> Guardar Registro</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal Form for Asset Config -->
+  <div class="modal-overlay" id="modalAsset">
+    <div class="modal-card" style="max-width: 500px;">
+      <div class="modal-header">
+        <h3 id="modalAssetTitle">Añadir Nuevo Fondo</h3>
+        <button class="close-btn" onclick="closeAssetModal()">&times;</button>
+      </div>
+      <form id="assetConfigForm" onsubmit="saveAssetConfig(event)">
+        <div class="modal-body">
+          <input type="hidden" id="assetEditId" value="">
+          <div class="form-group" style="margin-bottom: 14px;">
+            <label for="assetNameInput">Nombre del Fondo / Activo</label>
+            <input type="text" id="assetNameInput" class="form-control" placeholder="Ej: Vanguard Global Stock" required>
+          </div>
+          <div class="form-group" style="margin-bottom: 14px;">
+            <label for="assetIsinInput">ISIN / Ticker (Opcional)</label>
+            <input type="text" id="assetIsinInput" class="form-control" placeholder="Ej: IE00B0476091">
+          </div>
+          <div class="form-group">
+            <label for="assetTargetInput">Peso Objetivo (%)</label>
+            <input type="number" step="0.1" id="assetTargetInput" class="form-control" placeholder="Ej: 5.0" required>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" onclick="closeAssetModal()">Cancelar</button>
+          <button type="submit" class="btn btn-primary"><i class="fa-solid fa-save"></i> Guardar Fondo</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+
+  <!-- PIN Security Lock Screen Overlay -->
+  <div id="pinLockOverlay" style="display:flex; position: fixed; inset: 0; z-index: 99999; backdrop-filter: blur(16px); background: rgba(15, 23, 42, 0.9); align-items: center; justify-content: center; padding: 20px;">
+    <div style="background: white; max-width: 420px; width: 100%; padding: 32px; border-radius: 20px; box-shadow: 0 20px 40px rgba(0,0,0,0.3); text-align: center;">
+      <div style="width: 60px; height: 60px; background: linear-gradient(135deg, #4f46e5, #db2777); border-radius: 16px; margin: 0 auto 20px; display: flex; align-items: center; justify-content: center; color: white; font-size: 26px; box-shadow: 0 10px 20px rgba(79,70,229,0.3);">
+        <i class="fa-solid fa-user-lock"></i>
+      </div>
+      <h2 style="font-size: 1.4rem; font-weight: 700; color: #0f172a; margin-bottom: 8px;">Acceso Privado Protegido</h2>
+      <p style="font-size: 0.88rem; color: #64748b; margin-bottom: 24px;">Introduce tu PIN o Contraseña para acceder a tu cartera</p>
+      
+      <form onsubmit="unlockWithPin(event)">
+        <div class="form-group" style="margin-bottom: 14px;">
+          <input type="password" id="pinInputUnlock" class="form-control" placeholder="Introduce tu contraseña..." style="text-align: center; font-size: 1.1rem; padding: 12px;" required autofocus>
+        </div>
+        <div style="margin-bottom: 16px; font-size: 0.86rem; color: #64748b; display: flex; align-items: center; justify-content: center; gap: 8px;">
+          <input type="checkbox" id="rememberDeviceCheckbox" style="cursor: pointer; width: 16px; height: 16px;">
+          <label for="rememberDeviceCheckbox" style="cursor: pointer;">Recordar mientras el navegador esté abierto</label>
+        </div>
+        <div id="pinUnlockError" style="color: #ef4444; font-size: 0.82rem; margin-bottom: 14px; display: none;">❌ PIN incorrecto. Inténtalo de nuevo.</div>
+        <button type="submit" class="btn btn-primary" style="width: 100%; justify-content: center; padding: 12px; font-size: 1rem;">
+          <i class="fa-solid fa-key"></i> Desbloquear Cartera
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal Form for PIN Config -->
+  <div class="modal-overlay" id="modalPin">
+    <div class="modal-card" style="max-width: 450px;">
+      <div class="modal-header">
+        <h3>🔒 Configurar PIN de Seguridad Privado</h3>
+        <button class="close-btn" onclick="closePinModal()">&times;</button>
+      </div>
+      <form onsubmit="savePinConfig(event)">
+        <div class="modal-body">
+          <p style="font-size: 0.88rem; color: var(--text-muted); margin-bottom: 16px;">
+            Establece un PIN de seguridad. Cada vez que abras la web en tu ordenador o móvil, te pedirá este PIN para desbloquear la visualización.
+          </p>
+          <div class="form-group" style="margin-bottom: 16px;">
+            <label for="newPinInput">Nuevo PIN / Contraseña</label>
+            <input type="password" id="newPinInput" class="form-control" placeholder="Ej: 1234" required>
+          </div>
+          <div class="form-group">
+            <label for="confirmPinInput">Confirmar Nuevo PIN</label>
+            <input type="password" id="confirmPinInput" class="form-control" placeholder="Repite tu PIN" required>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-danger" onclick="removePinConfig()">Eliminar PIN</button>
+          <button type="button" class="btn btn-secondary" onclick="closePinModal()">Cancelar</button>
+          <button type="submit" class="btn btn-primary"><i class="fa-solid fa-shield-halved"></i> Guardar PIN</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script>
+    // Exact Funds & ETF Matching User's Broker Screenshots
+    const DEFAULT_ASSETS = [
+      { id: "ishares_dev", name: "iShares Developed World Index (IE) Acc Eur", isin: "IE000ZYRH0Q7", target: 42.0 },
+      { id: "vanguard_dev", name: "Vanguard Global Stock Index Fund Eur Acc", isin: "IE00B0476091", target: 0.0 }, // Transición progresiva hacia iShares
+      { id: "horos_val", name: "Horos Value Internacional FI", isin: "ES0146309002", target: 10.0 },
+      { id: "cobas_intl", name: "Cobas International Fund-P Acc Eur", isin: "ES0119199000", target: 10.0 },
+      { id: "vanguard_emerg", name: "Vanguard Emerging Markets Stock Index Fund", isin: "IE0031786696", target: 10.0 },
+      { id: "gold_etc", name: "iShares Physical Gold ETC", isin: "IE00B4ND3602 / PPFB GR", target: 8.0 },
+      { id: "vanguard_small", name: "Vanguard Global Small-Cap Index Fund Eur Acc", isin: "IE00B42W3509", target: 8.0 },
+      { id: "axa_cash", name: "AXA Trésor Court Terme C", isin: "FR0000447823", target: 8.0 },
+      { id: "crypto", name: "Criptoactivos", isin: "-", target: 4.0 }
+    ];
+
+    // Arranque neutro: las cifras reales solo llegan descifradas desde la nube.
+    // (Antes esta constante llevaba los saldos reales incrustados.)
+    const DEFAULT_RECORDS = [
+      {
+        date: "2026-01-01",
+        aport: 0,
+        msciNav: 1,
+        sp500Nav: 1,
+        assets: {},
+        stockAport: 0,
+        stockTotal: 0
+      }
+    ];
+
+    let assetsConfig = [];
+    let records = [];
+    let cloudSyncEnabled = true;
+    let currentFilterPeriod = 'ALL';
+    let filterStartMonth = '';
+    let filterEndMonth = '';
+
+    let chartPatrimonyInstance = null;
+    let chartReturnInstance = null;
+    let chartAllocationInstance = null;
+    let chartPillarsInstance = null;
+
+    // Formatters
+    const fmtEur = (val) => new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR' }).format(val || 0);
+    const fmtPct = (val) => (val >= 0 ? '+' : '') + (val || 0).toFixed(2) + '%';
+    const fmtDateDisplay = (dateStr) => {
+      if (!dateStr) return '';
+      const parts = dateStr.split('-');
+      if (parts.length === 3) return `${parts[2]}/${parts[1]}/${parts[0]}`;
+      return dateStr;
+    };
+
+    // ================= PRIVACIDAD: datos cifrados en la nube =================
+    // El JSON remoto guarda SOLO un envoltorio cifrado {v:2, salt, iv, ct}.
+    // La clave AES-256 se deriva del PIN con PBKDF2 y vive en memoria: nunca se
+    // guarda en disco. Sin el PIN correcto no hay datos, aunque alguien abra la web.
+    const CLOUD_KDF_ITER = 250000;
+    const SESSION_PIN_KEY = 'inv_pin_sesion';
+    const CLOUD_HISTORY_KEY = 'inv_cloud_history_v1';
+    const CLOUD_LAST_KEY = 'inv_cloud_last';
+    const CLOUD_HISTORY_MAX = 20;
+    let cryptoKey = null;
+    let cloudSalt = null;
+    let cloudIter = CLOUD_KDF_ITER;
+    let pendingCloud = null;      // envoltorio descargado a la espera del PIN
+    let migrationPending = false; // el JSON remoto todavia esta en claro
+    let savedPin = '';
+    let isUnlocked = false;
+
+    const b64ToBytes = (s) => Uint8Array.from(atob(s), c => c.charCodeAt(0));
+    const bytesToB64 = (buf) => btoa(Array.from(new Uint8Array(buf), b => String.fromCharCode(b)).join(''));
+
+    async function deriveCloudKey(pin, saltB64, iter) {
+      const salt = saltB64 ? b64ToBytes(saltB64) : crypto.getRandomValues(new Uint8Array(16));
+      const baseKey = await crypto.subtle.importKey('raw', new TextEncoder().encode(pin), 'PBKDF2', false, ['deriveKey']);
+      const key = await crypto.subtle.deriveKey(
+        { name: 'PBKDF2', salt, iterations: iter || CLOUD_KDF_ITER, hash: 'SHA-256' },
+        baseKey, { name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt']
+      );
+      return { key, salt: bytesToB64(salt) };
+    }
+
+    async function encryptCloud(obj) {
+      if (!cryptoKey) throw new Error('define el PIN antes de guardar');
+      const iv = crypto.getRandomValues(new Uint8Array(12));
+      const ct = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, cryptoKey, new TextEncoder().encode(JSON.stringify(obj)));
+      return { v: 2, kdf: 'PBKDF2-SHA256', iter: cloudIter, salt: cloudSalt, iv: bytesToB64(iv), ct: bytesToB64(ct) };
+    }
+
+    async function decryptCloud(env, pin) {
+      const { key } = await deriveCloudKey(pin, env.salt, env.iter);
+      const plain = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: b64ToBytes(env.iv) }, key, b64ToBytes(env.ct));
+      return { key, obj: JSON.parse(new TextDecoder().decode(plain)) };
+    }
+
+    function applyCloudPayload(payload) {
+      if (!payload) return;
+      if (payload.records && Array.isArray(payload.records)) records = payload.records;
+      if (payload.assetsConfig && Array.isArray(payload.assetsConfig)) assetsConfig = payload.assetsConfig;
+      localStorage.setItem('inversiones_assets_v8', JSON.stringify(assetsConfig));
+      localStorage.setItem('inversiones_records_v8', JSON.stringify(records));
+    }
+
+    function showLockOverlay(message) {
+      const overlay = document.getElementById('pinLockOverlay');
+      if (overlay) {
+        overlay.style.display = 'flex';
+        const p = overlay.querySelector('p');
+        if (p && message) p.innerText = message;
+      }
+      const badge = document.getElementById('pinStatusBadge');
+      if (badge) { badge.innerText = '🔒 Cifrado'; badge.className = 'badge badge-success'; }
+      isUnlocked = false;
+    }
+
+    function hideLockOverlay() {
+      const overlay = document.getElementById('pinLockOverlay');
+      if (overlay) overlay.style.display = 'none';
+      const badge = document.getElementById('pinStatusBadge');
+      if (badge) { badge.innerText = '🔓 Desbloqueado'; badge.className = 'badge badge-neutral'; }
+    }
+
+    function finishUnlock(pin) {
+      savedPin = pin;
+      isUnlocked = true;
+      localStorage.setItem('inversiones_pin_v1', 'guardado');
+      const chk = document.getElementById('rememberDeviceCheckbox');
+      if (chk && chk.checked) sessionStorage.setItem(SESSION_PIN_KEY, pin);
+      else sessionStorage.removeItem(SESSION_PIN_KEY);
+      const errBox = document.getElementById('pinUnlockError');
+      if (errBox) errBox.style.display = 'none';
+      const inp = document.getElementById('pinInputUnlock');
+      if (inp) inp.value = '';
+      hideLockOverlay();
+      renderAll();
+    }
+
+    // Init App
+    document.addEventListener('DOMContentLoaded', async () => {
+      loadData();
+      renderAll();
+      if (cloudSyncEnabled) {
+        await fetchFromCloud();
+      }
+    });
+
+    async function unlockWithPin(e) {
+      e.preventDefault();
+      const inputPin = document.getElementById('pinInputUnlock').value.trim();
+      const errBox = document.getElementById('pinUnlockError');
+      if (!inputPin) return;
+
+      // 1) El JSON remoto ya esta cifrado: el PIN tiene que descifrarlo
+      if (pendingCloud) {
+        try {
+          const { key, obj } = await decryptCloud(pendingCloud, inputPin);
+          cryptoKey = key;
+          cloudSalt = pendingCloud.salt;
+          cloudIter = pendingCloud.iter || CLOUD_KDF_ITER;
+          applyCloudPayload(obj);
+          pendingCloud = null;
+          finishUnlock(inputPin);
+        } catch (err) {
+          if (errBox) errBox.style.display = 'block';
+        }
+        return;
+      }
+
+      // 2) Migracion: los datos remotos estaban en claro, este PIN los cifra
+      if (migrationPending) {
+        if (inputPin.length < 6) {
+          const p = document.querySelector('#pinLockOverlay p');
+          if (p) p.innerText = 'El PIN debe tener al menos 6 caracteres. No se puede perder.';
+          return;
+        }
+        const { key, salt } = await deriveCloudKey(inputPin, null, CLOUD_KDF_ITER);
+        cryptoKey = key; cloudSalt = salt; cloudIter = CLOUD_KDF_ITER;
+        migrationPending = false;
+        finishUnlock(inputPin);
+        const ok = await pushToCloud();
+        if (ok) alert('Datos cifrados y guardados en la nube.\n\nApunta este PIN: sin el, tus datos no se pueden recuperar.');
+        else alert('No se pudo cifrar en la nube. Revisa el estado de sincronizacion y vuelve a intentarlo.');
+        return;
+      }
+
+      // 3) Sin conexion a la nube: el PIN solo cifra el guardado local
+      const { key, salt } = await deriveCloudKey(inputPin, cloudSalt, cloudIter);
+      cryptoKey = key; cloudSalt = salt;
+      finishUnlock(inputPin);
+    }
+
+    function openPinModal() {
+      document.getElementById('newPinInput').value = '';
+      document.getElementById('confirmPinInput').value = '';
+      document.getElementById('modalPin').classList.add('active');
+    }
+
+    function closePinModal() {
+      document.getElementById('modalPin').classList.remove('active');
+    }
+
+    async function savePinConfig(e) {
+      e.preventDefault();
+      const p1 = document.getElementById('newPinInput').value.trim();
+      const p2 = document.getElementById('confirmPinInput').value.trim();
+      if (p1 !== p2) {
+        alert("Los PINs introducidos no coinciden.");
+        return;
+      }
+      if (p1.length < 6) {
+        alert("Usa al menos 6 caracteres: de este PIN depende el cifrado de tus datos.");
+        return;
+      }
+      const { key, salt } = await deriveCloudKey(p1, null, CLOUD_KDF_ITER);
+      cryptoKey = key; cloudSalt = salt; cloudIter = CLOUD_KDF_ITER;
+      savedPin = p1;
+      localStorage.setItem('inversiones_pin_v1', 'guardado');
+      closePinModal();
+      const ok = await pushToCloud();
+      alert(ok
+        ? "PIN guardado y datos re-cifrados en la nube.\n\nSi olvidas este PIN, los datos no se pueden recuperar."
+        : "PIN aplicado en este navegador, pero no se pudo guardar en la nube. Revisa la sincronizacion.");
+    }
+
+    function removePinConfig() {
+      alert("Con los datos cifrados ya no se puede quitar el PIN: sin el, los datos serian ilegibles.\n\nUsa 'Cambiar PIN' si quieres otro.");
+      closePinModal();
+    }
+
+    let privacyModeActive = false;
+    function togglePrivacyMode() {
+      privacyModeActive = !privacyModeActive;
+      document.body.classList.toggle('privacy-mode', privacyModeActive);
+      const btn = document.getElementById('privacyToggleBtn');
+      if (btn) {
+        btn.innerHTML = privacyModeActive 
+          ? '<i class="fa-solid fa-eye"></i> Ver Saldos' 
+          : '<i class="fa-solid fa-eye-slash"></i> Ocultar Saldos';
+      }
+    }
+
+    const DEFAULT_CLOUD_URL = 'https://api.npoint.io/00c7f3df788f252ae701';
+
+    function loadData() {
+      const savedSync = localStorage.getItem('inversiones_cloud_sync_v1');
+      if (savedSync !== null) {
+        cloudSyncEnabled = savedSync === 'true';
+      } else {
+        cloudSyncEnabled = true;
+        localStorage.setItem('inversiones_cloud_sync_v1', 'true');
+      }
+      updateCloudToggleButton();
+      
+      const savedAssets = localStorage.getItem('inversiones_assets_v8');
+      if (savedAssets) {
+        try { assetsConfig = JSON.parse(savedAssets); } catch (e) { assetsConfig = JSON.parse(JSON.stringify(DEFAULT_ASSETS)); }
+      } else {
+        assetsConfig = JSON.parse(JSON.stringify(DEFAULT_ASSETS));
+      }
+
+      const savedRecords = localStorage.getItem('inversiones_records_v8');
+      if (savedRecords) {
+        try { 
+          records = JSON.parse(savedRecords); 
+          if (records.length < DEFAULT_RECORDS.length) {
+            records = JSON.parse(JSON.stringify(DEFAULT_RECORDS));
+          }
+        } catch (e) { records = JSON.parse(JSON.stringify(DEFAULT_RECORDS)); }
+      } else {
+        records = JSON.parse(JSON.stringify(DEFAULT_RECORDS));
+      }
+
+      updateCloudBadgeStatus();
+    }
+
+    function saveData() {
+      localStorage.setItem('inversiones_assets_v8', JSON.stringify(assetsConfig));
+      localStorage.setItem('inversiones_records_v8', JSON.stringify(records));
+      if (cloudSyncEnabled) {
+        pushToCloud();
+      }
+    }
+
+    // Universal Cloud Sync Engine
+    function updateCloudBadgeStatus(state, msg) {
+      const badge = document.getElementById('cloudStatusBadge');
+      if (!badge) return;
+      if (!cloudSyncEnabled) {
+        badge.innerText = '⚪ Guardado Local';
+        badge.className = 'badge badge-neutral';
+        return;
+      }
+      if (state === 'syncing') {
+        badge.innerText = '🔄 Guardando...';
+        badge.className = 'badge badge-warning';
+      } else if (state === 'success') {
+        badge.innerText = '🟢 Nube Sincronizada';
+        badge.className = 'badge badge-success';
+      } else if (state === 'error') {
+        badge.innerText = '⚠️ Error Nube';
+        badge.className = 'badge badge-danger';
+        if (msg) console.warn("Cloud Sync Error:", msg);
+      } else {
+        badge.innerText = '🟢 Nube Activa';
+        badge.className = 'badge badge-success';
+      }
+    }
+
+    function toggleCloudSync() {
+      cloudSyncEnabled = !cloudSyncEnabled;
+      localStorage.setItem('inversiones_cloud_sync_v1', cloudSyncEnabled);
+      updateCloudToggleButton();
+      if (cloudSyncEnabled) {
+        forceSyncCloud();
+      } else {
+        updateCloudBadgeStatus();
+      }
+    }
+
+    function updateCloudToggleButton() {
+      const btn = document.getElementById('toggleCloudBtn');
+      if (btn) {
+        if (cloudSyncEnabled) {
+          btn.innerHTML = '<i class="fa-solid fa-cloud"></i> Nube: ACTIVA';
+          btn.style.background = '#0284c7';
+        } else {
+          btn.innerHTML = '<i class="fa-solid fa-cloud-bolt"></i> Nube: INACTIVA';
+          btn.style.background = '#64748b';
+        }
+      }
+    }
+
+    async function forceSyncCloud() {
+      if (!cloudSyncEnabled) {
+        alert("La nube está inactiva. Actívala primero.");
+        return;
+      }
+      updateCloudBadgeStatus('syncing');
+      const pulled = await fetchFromCloud();
+      const pushed = await pushToCloud();
+      renderAll();
+      if (pulled || pushed) {
+        alert("¡Recarga y sincronización manual completadas con éxito!");
+      }
+    }
+
+    async function pushToCloud() {
+      if (!cloudSyncEnabled) return false;
+      if (!cryptoKey) {
+        updateCloudBadgeStatus('error', 'falta el PIN: no se sube nada sin cifrar');
+        return false;
+      }
+      updateCloudBadgeStatus('syncing');
+      try {
+        const payloadObj = { assetsConfig, records, lastUpdate: new Date().toISOString() };
+        const envelope = await encryptCloud(payloadObj);
+        saveEnvelopeLocally(envelope);
+
+        const res = await fetch(DEFAULT_CLOUD_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(envelope)
+        });
+
+        if (res.ok) {
+          updateCloudBadgeStatus('success');
+          return true;
+        } else {
+          updateCloudBadgeStatus('error', `HTTP ${res.status}`);
+          return false;
+        }
+      } catch (err) {
+        updateCloudBadgeStatus('error', err.message);
+        return false;
+      }
+    }
+
+    async function fetchFromCloud() {
+      if (!cloudSyncEnabled) return false;
+      try {
+        const response = await fetch(DEFAULT_CLOUD_URL + '?t=' + Date.now());
+        if (!response.ok) {
+          updateCloudBadgeStatus('error', `HTTP ${response.status}`);
+          return false;
+        }
+        const data = await response.json();
+
+        // --- Formato cifrado (v2) ---
+        if (data && data.v === 2 && data.ct) {
+          pendingCloud = data;
+          saveEnvelopeLocally(data);
+          cloudSalt = data.salt;
+          cloudIter = data.iter || CLOUD_KDF_ITER;
+          const pinSesion = sessionStorage.getItem(SESSION_PIN_KEY);
+          if (pinSesion) {
+            try {
+              const { key, obj } = await decryptCloud(data, pinSesion);
+              cryptoKey = key;
+              savedPin = pinSesion;
+              isUnlocked = true;
+              applyCloudPayload(obj);
+              pendingCloud = null;
+              sessionStorage.setItem(SESSION_PIN_KEY, pinSesion);
+              hideLockOverlay();
+              updateCloudBadgeStatus('success');
+              renderAll();
+              return true;
+            } catch (e) {
+              sessionStorage.removeItem(SESSION_PIN_KEY);
+            }
+          }
+          showLockOverlay('Introduce tu PIN para descifrar tu cartera');
+          updateCloudBadgeStatus('success');
+          return false;
+        }
+
+        // --- Formato antiguo en claro: hay que cifrarlo ---
+        const payload = data.data || data.record || data.payloadObj || data;
+        if (payload && payload.records && Array.isArray(payload.records)) {
+          applyCloudPayload(payload);
+          migrationPending = true;
+          showLockOverlay('Elige un PIN para cifrar tus datos (minimo 6 caracteres). No se puede perder.');
+          updateCloudBadgeStatus('error', 'sin cifrar');
+          return false;
+        }
+      } catch (err) {
+        // Nivel 1: si la nube falla o alguien la ha vaciado, tiramos de la copia local
+        const last = localStorage.getItem(CLOUD_LAST_KEY);
+        if (last) {
+          try {
+            const env = JSON.parse(last);
+            if (env && env.v === 2) {
+              pendingCloud = env;
+              cloudSalt = env.salt;
+              cloudIter = env.iter || CLOUD_KDF_ITER;
+              showLockOverlay('Sin conexion con la nube: introduce tu PIN para abrir la ultima copia local');
+              updateCloudBadgeStatus('error', 'offline: copia local');
+              return false;
+            }
+          } catch (e) { /* copia local corrupta: seguimos */ }
+        }
+        updateCloudBadgeStatus('error', err.message);
+        return false;
+      }
+      return false;
+    }
+
+    // ===== Nivel 1: copias de seguridad (no depender de que npoint siga intacto) =====
+    function saveEnvelopeLocally(envelope) {
+      try {
+        if (!envelope || envelope.v !== 2) return;
+        const hist = JSON.parse(localStorage.getItem(CLOUD_HISTORY_KEY) || '[]');
+        hist.unshift({ ts: new Date().toISOString(), env: envelope });
+        localStorage.setItem(CLOUD_HISTORY_KEY, JSON.stringify(hist.slice(0, CLOUD_HISTORY_MAX)));
+        localStorage.setItem(CLOUD_LAST_KEY, JSON.stringify(envelope));
+      } catch (e) {
+        console.warn('no se pudo guardar la copia local:', e);
+      }
+    }
+
+    function downloadCloudBackup() {
+      let env = pendingCloud;
+      if (!env) {
+        try { env = JSON.parse(localStorage.getItem(CLOUD_LAST_KEY) || 'null'); } catch (e) { env = null; }
+      }
+      if (!env || env.v !== 2) {
+        alert('Todavia no hay copia cifrada en este navegador.\n\nAbre la web, introduce el PIN y vuelve a intentarlo.');
+        return;
+      }
+      const blob = new Blob([JSON.stringify(env, null, 2)], { type: 'application/json' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = 'cartera-cifrada-' + new Date().toISOString().slice(0, 10) + '.json';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+    }
+
+    async function restoreCloudBackup(input) {
+      const file = input.files && input.files[0];
+      if (!file) return;
+      try {
+        const env = JSON.parse(await file.text());
+        if (!env || env.v !== 2 || !env.ct) {
+          alert('Ese fichero no es una copia cifrada valida.');
+          input.value = '';
+          return;
+        }
+        if (!confirm('Se reemplazaran los datos de la nube por esta copia. Continuar?')) {
+          input.value = '';
+          return;
+        }
+        const res = await fetch(DEFAULT_CLOUD_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(env)
+        });
+        if (res.ok) {
+          saveEnvelopeLocally(env);
+          alert('Copia restaurada. Recarga la pagina e introduce tu PIN.');
+        } else {
+          alert('No se pudo restaurar (HTTP ' + res.status + ').');
+        }
+      } catch (e) {
+        alert('Error leyendo el fichero: ' + e.message);
+      }
+      input.value = '';
+    }
+
+    // Master Calculations Engine with Exact Day Time Differences
+    function calculateProcessedData() {
+      let cumulativeInvested = 0;
+      let cumulativeInvestedStock = 0;
+      let msciShares = 0;
+      let sp500Shares = 0;
+      let target5Val = 0;
+      let target9Val = 0;
+
+      const dailyFactor5 = Math.pow(1 + 0.05, 1 / 365.25);
+      const dailyFactor9 = Math.pow(1 + 0.09, 1 / 365.25);
+
+      const allProcessed = records.map((r, index) => {
+        cumulativeInvested += r.aport;
+        const sAport = r.stockAport || 0;
+        const sTotal = r.stockTotal || 0;
+        cumulativeInvestedStock += sAport;
+
+        // Portfolio real total
+        let realTotal = 0;
+        if (r.assets && typeof r.assets === 'object') {
+          Object.values(r.assets).forEach(val => { realTotal += parseFloat(val) || 0; });
+        }
+
+        const gainReal = realTotal - cumulativeInvested;
+        const returnRealPct = cumulativeInvested > 0 ? (gainReal / cumulativeInvested) * 100 : 0;
+        
+        // Acciones Logic
+        const gainStock = sTotal - cumulativeInvestedStock;
+        const returnStockPct = cumulativeInvestedStock > 0 ? (gainStock / cumulativeInvestedStock) * 100 : 0;
+
+        // Total Wealth Logic
+        const totalWealth = realTotal + sTotal;
+        const totalWealthInvested = cumulativeInvested + cumulativeInvestedStock;
+        const gainTotalWealth = totalWealth - totalWealthInvested;
+        const returnTotalWealthPct = totalWealthInvested > 0 ? (gainTotalWealth / totalWealthInvested) * 100 : 0;
+
+
+        // En el primer registro (día 1), partimos del valor real de la cartera 
+        // para que todos los puntos (SBS, MSCI, S&P500 y Targets) salgan del mismo valor exacto.
+        let amountToInvest = r.aport;
+        if (index === 0) {
+          amountToInvest = realTotal;
+        }
+
+        // MSCI World theoretical simulation
+        if (r.msciNav > 0) {
+          msciShares += amountToInvest / r.msciNav;
+        }
+        const msciVal = msciShares * r.msciNav;
+        const gainMsci = msciVal - cumulativeInvested;
+        const returnMsciPct = cumulativeInvested > 0 ? (gainMsci / cumulativeInvested) * 100 : 0;
+
+        // S&P 500 theoretical simulation
+        if (r.sp500Nav > 0) {
+          sp500Shares += amountToInvest / r.sp500Nav;
+        }
+        const sp500Val = sp500Shares * r.sp500Nav;
+        const gainSp500 = sp500Val - cumulativeInvested;
+        const returnSp500Pct = cumulativeInvested > 0 ? (gainSp500 / cumulativeInvested) * 100 : 0;
+
+        // Exact Days Compounding for Targets
+        if (index === 0) {
+          target5Val = realTotal;
+          target9Val = realTotal;
+        } else {
+          const prevDate = new Date(records[index - 1].date);
+          const currDate = new Date(r.date);
+          const diffTime = Math.max(0, currDate - prevDate);
+          const diffDays = diffTime / (1000 * 60 * 60 * 24);
+
+          target5Val = target5Val * Math.pow(dailyFactor5, diffDays) + r.aport;
+          target9Val = target9Val * Math.pow(dailyFactor9, diffDays) + r.aport;
+        }
+
+        return {
+          ...r,
+          cumulativeInvested,
+          realTotal,
+          gainReal,
+          returnRealPct,
+          msciVal,
+          returnMsciPct,
+          sp500Val,
+          returnSp500Pct,
+          target5Val,
+          target9Val,
+          stockTotal: sTotal,
+          stockAport: sAport,
+          cumulativeInvestedStock,
+          gainStock,
+          returnStockPct,
+          totalWealth,
+          totalWealthInvested,
+          gainTotalWealth,
+          returnTotalWealthPct
+        };
+      });
+
+      return filterProcessedByPeriod(allProcessed);
+    }
+
+    // Filter Logic by Time Period
+    function filterProcessedByPeriod(processed) {
+      if (processed.length === 0) return [];
+      
+      let filtered = processed;
+
+      if (currentFilterPeriod === '1Y') {
+        const lastDate = new Date(processed[processed.length - 1].date);
+        const startDate = new Date(lastDate);
+        startDate.setFullYear(startDate.getFullYear() - 1);
+        const startDateStr = startDate.toISOString().slice(0, 10);
+        filtered = processed.filter(p => p.date >= startDateStr);
+      } else if (currentFilterPeriod === '6M') {
+        const lastDate = new Date(processed[processed.length - 1].date);
+        const startDate = new Date(lastDate);
+        startDate.setMonth(startDate.getMonth() - 6);
+        filtered = processed.filter(p => p.date >= startDate.toISOString().slice(0, 10));
+      } else if (currentFilterPeriod === '3M') {
+        const lastDate = new Date(processed[processed.length - 1].date);
+        const startDate = new Date(lastDate);
+        startDate.setMonth(startDate.getMonth() - 3);
+        filtered = processed.filter(p => p.date >= startDate.toISOString().slice(0, 10));
+      } else if (currentFilterPeriod === '1M') {
+        const lastDate = new Date(processed[processed.length - 1].date);
+        const startDate = new Date(lastDate);
+        startDate.setMonth(startDate.getMonth() - 1);
+        filtered = processed.filter(p => p.date >= startDate.toISOString().slice(0, 10));
+      } else if (currentFilterPeriod === '1W') {
+        const lastDate = new Date(processed[processed.length - 1].date);
+        const startDate = new Date(lastDate);
+        startDate.setDate(startDate.getDate() - 7);
+        filtered = processed.filter(p => p.date >= startDate.toISOString().slice(0, 10));
+      } else if (currentFilterPeriod === '1D') {
+        const lastDate = new Date(processed[processed.length - 1].date);
+        const startDate = new Date(lastDate);
+        startDate.setDate(startDate.getDate() - 1);
+        filtered = processed.filter(p => p.date >= startDate.toISOString().slice(0, 10));
+      } else if (currentFilterPeriod === 'YTD') {
+        const lastDateStr = processed[processed.length - 1].date;
+        const currentYear = lastDateStr.split('-')[0];
+        filtered = processed.filter(p => p.date.startsWith(currentYear));
+      } else if (currentFilterPeriod === 'CUSTOM') {
+        if (filterStartMonth) filtered = filtered.filter(p => p.date >= filterStartMonth);
+        if (filterEndMonth) filtered = filtered.filter(p => p.date <= filterEndMonth);
+      }
+
+      return filtered.length > 0 ? filtered : processed;
+    }
+
+    function setPeriodFilter(period, btn) {
+      currentFilterPeriod = period;
+      document.querySelectorAll('.pill-btn').forEach(b => b.classList.remove('active'));
+      if (btn) btn.classList.add('active');
+      document.getElementById('filterStartDate').value = '';
+      document.getElementById('filterEndDate').value = '';
+      filterStartMonth = '';
+      filterEndMonth = '';
+      renderAll();
+    }
+
+    function applyCustomDateFilter() {
+      filterStartMonth = document.getElementById('filterStartDate').value;
+      filterEndMonth = document.getElementById('filterEndDate').value;
+      if (filterStartMonth || filterEndMonth) {
+        currentFilterPeriod = 'CUSTOM';
+        document.querySelectorAll('.pill-btn').forEach(b => b.classList.remove('active'));
+      }
+      renderAll();
+    }
+
+    // Render Master Function
+    function renderAll() {
+      const processed = calculateProcessedData();
+      renderKPIs(processed);
+      renderCharts(processed);
+      renderAllocationTable(processed);
+      renderAssetsConfigTable();
+      renderHistoryTable(processed);
+      calculateRebalance();
+      renderAnnualStats(processed);
+    }
+
+    // Render KPIs
+    function renderKPIs(processed) {
+      if (processed.length === 0) return;
+      const last = processed[processed.length - 1];
+
+      // 1. Patrimonio Total
+      const elWealthVal = document.getElementById('kpiWealthVal');
+      if (elWealthVal) elWealthVal.innerText = fmtEur(last.totalWealth);
+      const elWealthBadge = document.getElementById('kpiWealthBadge');
+      if (elWealthBadge) {
+        elWealthBadge.innerText = fmtPct(last.returnTotalWealthPct);
+        elWealthBadge.className = `badge ${last.returnTotalWealthPct >= 0 ? 'badge-success' : 'badge-danger'}`;
+      }
+      const elWealthGain = document.getElementById('kpiWealthGain');
+      if (elWealthGain) elWealthGain.innerText = `${fmtEur(last.gainTotalWealth)} ganancia`;
+
+      // 2. MyInvestor + Cripto
+      const elRealVal = document.getElementById('kpiRealVal');
+      if (elRealVal) elRealVal.innerText = fmtEur(last.realTotal);
+      const elRealBadge = document.getElementById('kpiRealBadge');
+      if (elRealBadge) {
+        elRealBadge.innerText = fmtPct(last.returnRealPct);
+        elRealBadge.className = `badge ${last.returnRealPct >= 0 ? 'badge-success' : 'badge-danger'}`;
+      }
+      const elRealGain = document.getElementById('kpiRealGain');
+      if (elRealGain) elRealGain.innerText = `${fmtEur(last.gainReal)} ganancia`;
+
+      // 3. Acciones Trading 212
+      const elStockVal = document.getElementById('kpiStockVal');
+      if (elStockVal) elStockVal.innerText = fmtEur(last.stockTotal);
+      const elStockBadge = document.getElementById('kpiStockBadge');
+      if (elStockBadge) {
+        elStockBadge.innerText = fmtPct(last.returnStockPct);
+        elStockBadge.className = `badge ${last.returnStockPct >= 0 ? 'badge-success' : 'badge-danger'}`;
+      }
+      const elStockGain = document.getElementById('kpiStockGain');
+      if (elStockGain) elStockGain.innerText = `${fmtEur(last.gainStock)} ganancia`;
+
+      // 4. Alpha vs Benchmarks
+      const alphaMsci = last.returnTotalWealthPct - last.returnMsciPct;
+      const alphaSp500 = last.returnTotalWealthPct - last.returnSp500Pct;
+      const elAlphaVal = document.getElementById('kpiAlphaMsciVal');
+      if (elAlphaVal) {
+        elAlphaVal.innerText = `${alphaMsci >= 0 ? '+' : ''}${alphaMsci.toFixed(2)}%`;
+        elAlphaVal.className = `kpi-value ${alphaMsci >= 0 ? 'text-success' : 'text-danger'}`;
+      }
+      const elAlphaBadge = document.getElementById('kpiAlphaBadge');
+      if (elAlphaBadge) {
+        elAlphaBadge.innerText = alphaMsci >= 0 ? '🏆 Batiendo MSCI' : 'vs MSCI World';
+        elAlphaBadge.className = `badge ${alphaMsci >= 0 ? 'badge-success' : 'badge-danger'}`;
+      }
+      const elAlphaSp = document.getElementById('kpiAlphaSp500Val');
+      if (elAlphaSp) {
+        elAlphaSp.innerText = `vs S&P 500: ${alphaSp500 >= 0 ? '+' : ''}${alphaSp500.toFixed(2)}%`;
+      }
+
+      // 5. Total Invested in Period
+      const periodAport = processed.reduce((sum, p) => sum + p.aport + (p.stockAport || 0), 0);
+      const elInvestedVal = document.getElementById('kpiInvestedVal');
+      if (elInvestedVal) elInvestedVal.innerText = fmtEur(periodAport);
+      const elMonthsCount = document.getElementById('kpiMonthsCount');
+      if (elMonthsCount) elMonthsCount.innerText = `${processed.length} registros en rango`;
+    }
+
+    // Render Charts
+    function renderCharts(processed) {
+      const labels = processed.map(p => fmtDateDisplay(p.date));
+
+      const dsCumulative = processed.map((p, i) => ({ x: i, y: p.cumulativeInvested }));
+      const dsReal = processed.map((p, i) => ({ x: i, y: p.realTotal }));
+      const dsStock = processed.map((p, i) => ({ x: i, y: p.stockTotal }));
+      const dsWealth = processed.map((p, i) => ({ x: i, y: p.totalWealth }));
+      const dsMsci = processed.map((p, i) => ({ x: i, y: p.msciVal }));
+      const dsSp500 = processed.map((p, i) => ({ x: i, y: p.sp500Val }));
+      const dsTarget5 = processed.map((p, i) => ({ x: i, y: p.target5Val }));
+      const dsTarget9 = processed.map((p, i) => ({ x: i, y: p.target9Val }));
+
+      // Chart 1: Patrimony
+      const ctxPatrimony = document.getElementById('chartPatrimony').getContext('2d');
+      if (chartPatrimonyInstance) chartPatrimonyInstance.destroy();
+
+      chartPatrimonyInstance = new Chart(ctxPatrimony, {
+        type: 'line',
+        data: {
+          datasets: [
+            {
+              label: 'Patrimonio Total',
+              data: dsWealth,
+              borderColor: '#4f46e5',
+              borderWidth: 3.5,
+              pointRadius: 4,
+              pointHoverRadius: 7,
+              fill: false,
+              tension: 0.25
+            },
+            {
+              label: 'MyInvestor + Cripto',
+              data: dsReal,
+              borderColor: '#0284c7',
+              borderWidth: 2.8,
+              pointRadius: 3.5,
+              pointHoverRadius: 6,
+              fill: false,
+              tension: 0.25
+            },
+            {
+              label: 'Acciones Trading 212',
+              data: dsStock,
+              borderColor: '#8b5cf6',
+              borderWidth: 2.8,
+              pointRadius: 3.5,
+              pointHoverRadius: 6,
+              fill: false,
+              tension: 0.25
+            },
+            {
+              label: 'Total Aportado',
+              data: dsCumulative,
+              borderColor: '#94a3b8',
+              borderDash: [5, 4],
+              borderWidth: 2,
+              pointRadius: 0,
+              fill: false,
+              tension: 0.1
+            },
+            {
+              label: 'MSCI World (Sim.)',
+              data: dsMsci,
+              borderColor: '#f59e0b',
+              borderDash: [6, 4],
+              borderWidth: 2,
+              pointRadius: 2,
+              fill: false,
+              tension: 0.25
+            },
+            {
+              label: 'S&P 500 (Sim.)',
+              data: dsSp500,
+              borderColor: '#f43f5e',
+              borderDash: [6, 4],
+              borderWidth: 2,
+              pointRadius: 2,
+              fill: false,
+              tension: 0.25
+            },
+            {
+              label: 'Target 5% Anual',
+              data: dsTarget5,
+              borderColor: '#10b98188',
+              borderDash: [3, 5],
+              borderWidth: 1.2,
+              pointRadius: 0,
+              fill: false,
+              tension: 0.2
+            },
+            {
+              label: 'Target 9% Anual',
+              data: dsTarget9,
+              borderColor: '#6366f188',
+              borderDash: [3, 5],
+              borderWidth: 1.2,
+              pointRadius: 0,
+              fill: false,
+              tension: 0.2
+            }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          events: ['click', 'touchstart'],
+          animation: false,
+          transitions: { zoom: { animation: { duration: 0 } } },
+          elements: {
+            point: { hitRadius: 15, hoverRadius: 8 }
+          },
+          interaction: {
+            mode: 'nearest',
+            intersect: true
+          },
+          onClick: (event, elements, chart) => {
+            if (!elements || elements.length === 0) {
+              chart.setActiveElements([]);
+              if (chart.tooltip) {
+                chart.tooltip.setActiveElements([], { x: 0, y: 0 });
+              }
+              chart.update();
+            }
+          },
+          plugins: {
+            legend: { labels: { color: '#334155', font: { family: 'Outfit', weight: '600' } } },
+            tooltip: {
+              events: ['click', 'touchstart'],
+              mode: 'nearest',
+              intersect: true,
+              callbacks: {
+                title: (items) => {
+                  if (!items || !items.length) return '';
+                  const idx = Math.round(items[0].parsed.x);
+                  return labels[idx] || '';
+                },
+                label: (ctx) => `${ctx.dataset.label}: ${fmtEur(ctx.raw.y !== undefined ? ctx.raw.y : ctx.raw)}`
+              }
+            },
+            zoom: {
+              pan: {
+                enabled: true,
+                mode: 'xy',
+                threshold: 0
+              },
+              zoom: {
+                wheel: { enabled: true, speed: 0.08 },
+                pinch: { enabled: true },
+                mode: 'xy'
+              }
+            }
+          },
+          scales: {
+            x: {
+              type: 'linear',
+              min: 0,
+              max: Math.max(0, processed.length - 1),
+              ticks: {
+                stepSize: 1,
+                color: '#64748b',
+                callback: (val) => {
+                  const idx = Math.round(val);
+                  if (idx >= 0 && idx < labels.length && Math.abs(val - idx) < 0.01) {
+                    return labels[idx];
+                  }
+                  return '';
+                }
+              },
+              grid: { color: '#e2e8f0' }
+            },
+            y: {
+              type: 'linear',
+              beginAtZero: false,
+              grace: '5%',
+              ticks: { color: '#64748b', callback: (v) => fmtEur(v) },
+              grid: { color: '#e2e8f0' }
+            }
+          }
+        }
+      });
+
+      // Chart 2: Cumulative Return %
+      const dsReturnReal = processed.map((p, i) => ({ x: i, y: p.returnRealPct }));
+      const dsReturnStock = processed.map((p, i) => ({ x: i, y: p.returnStockPct }));
+      const dsReturnWealth = processed.map((p, i) => ({ x: i, y: p.returnTotalWealthPct }));
+      const dsReturnMsci = processed.map((p, i) => ({ x: i, y: p.returnMsciPct }));
+      const dsReturnSp500 = processed.map((p, i) => ({ x: i, y: p.returnSp500Pct }));
+
+      const ctxReturn = document.getElementById('chartReturn').getContext('2d');
+      if (chartReturnInstance) chartReturnInstance.destroy();
+
+      chartReturnInstance = new Chart(ctxReturn, {
+        type: 'line',
+        data: {
+          datasets: [
+            {
+              label: 'Patrimonio Total %',
+              data: dsReturnWealth,
+              borderColor: '#4f46e5',
+              borderWidth: 3.5,
+              pointRadius: 4,
+              pointHoverRadius: 7,
+              tension: 0.25
+            },
+            {
+              label: 'MyInvestor + Cripto %',
+              data: dsReturnReal,
+              borderColor: '#0284c7',
+              borderWidth: 2.8,
+              pointRadius: 3.5,
+              pointHoverRadius: 6,
+              tension: 0.25
+            },
+            {
+              label: 'Acciones Trading 212 %',
+              data: dsReturnStock,
+              borderColor: '#8b5cf6',
+              borderWidth: 2.8,
+              pointRadius: 3.5,
+              pointHoverRadius: 6,
+              tension: 0.25
+            },
+            {
+              label: 'MSCI World %',
+              data: dsReturnMsci,
+              borderColor: '#f59e0b',
+              borderDash: [6, 4],
+              borderWidth: 2,
+              pointRadius: 2,
+              tension: 0.25
+            },
+            {
+              label: 'S&P 500 %',
+              data: dsReturnSp500,
+              borderColor: '#f43f5e',
+              borderDash: [6, 4],
+              borderWidth: 2,
+              pointRadius: 2,
+              tension: 0.25
+            }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          events: ['click', 'touchstart'],
+          animation: false,
+          transitions: { zoom: { animation: { duration: 0 } } },
+          elements: {
+            point: { hitRadius: 15, hoverRadius: 8 }
+          },
+          interaction: {
+            mode: 'nearest',
+            intersect: true
+          },
+          onClick: (event, elements, chart) => {
+            if (!elements || elements.length === 0) {
+              chart.setActiveElements([]);
+              if (chart.tooltip) {
+                chart.tooltip.setActiveElements([], { x: 0, y: 0 });
+              }
+              chart.update();
+            }
+          },
+          plugins: {
+            legend: { labels: { color: '#334155', font: { family: 'Outfit', weight: '600' } } },
+            tooltip: {
+              events: ['click', 'touchstart'],
+              mode: 'nearest',
+              intersect: true,
+              callbacks: {
+                title: (items) => {
+                  if (!items || !items.length) return '';
+                  const idx = Math.round(items[0].parsed.x);
+                  return labels[idx] || '';
+                },
+                label: (ctx) => `${ctx.dataset.label}: ${fmtPct(ctx.raw.y !== undefined ? ctx.raw.y : ctx.raw)}`
+              }
+            },
+            zoom: {
+              pan: {
+                enabled: true,
+                mode: 'xy',
+                threshold: 0
+              },
+              zoom: {
+                wheel: { enabled: true, speed: 0.08 },
+                pinch: { enabled: true },
+                mode: 'xy'
+              }
+            }
+          },
+          scales: {
+            x: {
+              type: 'linear',
+              min: 0,
+              max: Math.max(0, processed.length - 1),
+              ticks: {
+                stepSize: 1,
+                color: '#64748b',
+                callback: (val) => {
+                  const idx = Math.round(val);
+                  if (idx >= 0 && idx < labels.length && Math.abs(val - idx) < 0.01) {
+                    return labels[idx];
+                  }
+                  return '';
+                }
+              },
+              grid: { color: '#e2e8f0' }
+            },
+            y: {
+              type: 'linear',
+              beginAtZero: false,
+              grace: '5%',
+              ticks: { color: '#64748b', callback: (v) => fmtPct(v) },
+              grid: { color: '#e2e8f0' }
+            }
+          }
+        }
+      });
+
+      // Chart 3 & 4: Asset Donut & 3-Pillars Donut
+      if (processed.length > 0) {
+        const last = processed[processed.length - 1];
+
+        // 1. Macro 3 Pillars Donut
+        const elPillars = document.getElementById('chartPillars');
+        if (elPillars) {
+          const ctxPillars = elPillars.getContext('2d');
+          if (chartPillarsInstance) chartPillarsInstance.destroy();
+
+          const cryptoVal = (last.assets && last.assets['crypto']) ? parseFloat(last.assets['crypto']) : 0;
+          const fundsVal = Math.max(0, last.realTotal - cryptoVal);
+          const stocksVal = last.stockTotal || 0;
+          const totalPillars = fundsVal + stocksVal + cryptoVal || 1;
+
+          chartPillarsInstance = new Chart(ctxPillars, {
+            type: 'doughnut',
+            data: {
+              labels: ['Fondos MyInvestor', 'Acciones Trading 212', 'Criptoactivos Kraken'],
+              datasets: [{
+                data: [fundsVal, stocksVal, cryptoVal],
+                backgroundColor: ['#0284c7', '#8b5cf6', '#f59e0b'],
+                borderWidth: 2,
+                borderColor: '#ffffff'
+              }]
+            },
+            options: {
+              responsive: true,
+              maintainAspectRatio: false,
+              plugins: {
+                legend: { position: 'bottom', labels: { color: '#334155', font: { family: 'Outfit', size: 12, weight: '600' }, padding: 14 } },
+                tooltip: {
+                  callbacks: {
+                    label: (ctx) => `${ctx.label}: ${fmtEur(ctx.raw)} (${((ctx.raw / totalPillars) * 100).toFixed(1)}%)`
+                  }
+                }
+              },
+              cutout: '65%'
+            }
+          });
+        }
+
+        // 2. Detailed Assets Donut
+        const elAllocation = document.getElementById('chartAllocation');
+        if (elAllocation) {
+          const ctxAllocation = elAllocation.getContext('2d');
+          if (chartAllocationInstance) chartAllocationInstance.destroy();
+
+          const labels = assetsConfig.map(a => a.name);
+          const assetValues = assetsConfig.map(a => (last.assets && last.assets[a.id]) ? parseFloat(last.assets[a.id]) : 0);
+
+          chartAllocationInstance = new Chart(ctxAllocation, {
+            type: 'doughnut',
+            data: {
+              labels: labels,
+              datasets: [{
+                data: assetValues,
+                backgroundColor: [
+                  '#0284c7', '#4f46e5', '#8b5cf6', '#a855f7',
+                  '#db2777', '#d97706', '#10b981', '#06b6d4', '#ef4444', '#84cc16'
+                ],
+                borderWidth: 2,
+                borderColor: '#ffffff'
+              }]
+            },
+            options: {
+              responsive: true,
+              maintainAspectRatio: false,
+              plugins: {
+                legend: { position: 'right', labels: { color: '#334155', font: { family: 'Outfit', size: 11, weight: '500' } } },
+                tooltip: {
+                  callbacks: {
+                    label: (ctx) => `${ctx.label}: ${fmtEur(ctx.raw)} (${((ctx.raw / (last.realTotal || 1)) * 100).toFixed(1)}%)`
+                  }
+                }
+              },
+              cutout: '60%'
+            }
+          });
+        }
+      }
+    }
+
+    // Render Allocation Table
+    function renderAllocationTable(processed) {
+      if (processed.length === 0) return;
+      const last = processed[processed.length - 1];
+      const tbody = document.getElementById('assetBreakdownBody');
+      tbody.innerHTML = '';
+
+      assetsConfig.forEach((asset) => {
+        const val = (last.assets && last.assets[asset.id]) ? parseFloat(last.assets[asset.id]) : 0;
+        const currentWeight = last.realTotal > 0 ? (val / last.realTotal) * 100 : 0;
+        const diff = currentWeight - asset.target;
+
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td>
+            <div class="text-bold">${asset.name}</div>
+            <div class="text-muted" style="font-size: 0.75rem;">ISIN/Ticker: ${asset.isin || '-'}</div>
+          </td>
+          <td>${asset.target.toFixed(1)}%</td>
+          <td class="text-bold">${fmtEur(val)}</td>
+          <td>
+            ${currentWeight.toFixed(1)}%
+            <div class="progress-bar-bg">
+              <div class="progress-bar-fill" style="width: ${Math.min(currentWeight, 100)}%;"></div>
+            </div>
+          </td>
+          <td>
+            <span class="badge ${Math.abs(diff) <= 2 ? 'badge-success' : (diff > 0 ? 'badge-neutral' : 'badge-danger')}">
+              ${diff >= 0 ? '+' : ''}${diff.toFixed(1)}%
+            </span>
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    // Render Assets Config Management Table
+    function renderAssetsConfigTable() {
+      const tbody = document.getElementById('assetsConfigBody');
+      tbody.innerHTML = '';
+      let totalTarget = 0;
+
+      assetsConfig.forEach((asset, idx) => {
+        totalTarget += asset.target || 0;
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td class="text-bold">${asset.name}</td>
+          <td>${asset.isin || '-'}</td>
+          <td class="text-bold">${(asset.target || 0).toFixed(1)}%</td>
+          <td>
+            <button class="btn btn-secondary" style="padding: 4px 8px; font-size: 0.8rem;" onclick="openEditAssetModal(${idx})">
+              <i class="fa-solid fa-pen"></i>
+            </button>
+            <button class="btn btn-danger" style="padding: 4px 8px; font-size: 0.8rem;" onclick="deleteAsset(${idx})">
+              <i class="fa-solid fa-trash"></i>
+            </button>
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+
+      document.getElementById('totalTargetWeightCell').innerText = `${totalTarget.toFixed(1)}%`;
+      document.getElementById('totalTargetWeightCell').className = Math.abs(totalTarget - 100) < 0.1 ? 'text-success' : 'text-danger';
+    }
+
+    // Render History Table
+    function renderHistoryTable(processed) {
+      const tbody = document.getElementById('historyTableBody');
+      tbody.innerHTML = '';
+
+      processed.slice().reverse().forEach((r, revIdx) => {
+        const realIdx = processed.length - 1 - revIdx;
+        const tr = document.createElement('tr');
+
+        tr.innerHTML = `
+          <td class="text-bold">${fmtDateDisplay(r.date)}</td>
+          <td>${fmtEur(r.aport)}</td>
+          <td>${fmtEur(r.cumulativeInvested)}</td>
+          <td class="text-bold">${fmtEur(r.realTotal)}</td>
+          <td class="${r.gainReal >= 0 ? 'text-success' : 'text-danger'}">${fmtEur(r.gainReal)}</td>
+          <td><span class="badge ${r.returnRealPct >= 0 ? 'badge-success' : 'badge-danger'}">${fmtPct(r.returnRealPct)}</span></td>
+          <td>${fmtEur(r.msciVal)}</td>
+          <td><span class="badge ${r.returnMsciPct >= 0 ? 'badge-success' : 'badge-danger'}">${fmtPct(r.returnMsciPct)}</span></td>
+          <td>${fmtEur(r.sp500Val)}</td>
+          <td><span class="badge ${r.returnSp500Pct >= 0 ? 'badge-success' : 'badge-danger'}">${fmtPct(r.returnSp500Pct)}</span></td>
+          <td>
+            <button class="btn btn-secondary" style="padding: 4px 8px; font-size: 0.8rem;" onclick="openEditModal(${realIdx})">
+              <i class="fa-solid fa-pen"></i>
+            </button>
+            <button class="btn btn-danger" style="padding: 4px 8px; font-size: 0.8rem;" onclick="deleteRecord(${realIdx})">
+              <i class="fa-solid fa-trash"></i>
+            </button>
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    // Calculate Rebalance Suggestions
+    function calculateRebalance() {
+      const processed = calculateProcessedData();
+      if (processed.length === 0) return;
+
+      const last = processed[processed.length - 1];
+      const nextAport = parseFloat(document.getElementById('nextAportInput').value) || 0;
+      const targetPortfolioTotal = last.realTotal + nextAport;
+
+      const tbody = document.getElementById('rebalanceTableBody');
+      tbody.innerHTML = '';
+
+      let rawDiffs = assetsConfig.map(asset => {
+        const currentVal = (last.assets && last.assets[asset.id]) ? parseFloat(last.assets[asset.id]) : 0;
+        const targetVal = targetPortfolioTotal * (asset.target / 100);
+        const needed = Math.max(0, targetVal - currentVal);
+        return { asset, currentVal, targetVal, needed };
+      });
+
+      const totalNeeded = rawDiffs.reduce((sum, item) => sum + item.needed, 0);
+
+      rawDiffs.forEach(item => {
+        let buyAmount = 0;
+        if (totalNeeded > 0) {
+          buyAmount = (item.needed / totalNeeded) * nextAport;
+        } else {
+          buyAmount = nextAport * (item.asset.target / 100);
+        }
+
+        const newTotalVal = item.currentVal + buyAmount;
+        const newWeight = targetPortfolioTotal > 0 ? (newTotalVal / targetPortfolioTotal) * 100 : 0;
+        const currentWeight = last.realTotal > 0 ? (item.currentVal / last.realTotal) * 100 : 0;
+
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td class="text-bold">${item.asset.name}</td>
+          <td>${item.asset.target.toFixed(1)}%</td>
+          <td>${fmtEur(item.currentVal)}</td>
+          <td>${currentWeight.toFixed(1)}%</td>
+          <td class="text-bold text-success">+${fmtEur(buyAmount)}</td>
+          <td>${newWeight.toFixed(1)}%</td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    
+    function renderAnnualStats(processed) {
+      const tbody = document.getElementById('annualStatsTableBody');
+      if (!tbody) return;
+      tbody.innerHTML = '';
+      if (processed.length === 0) return;
+
+      // Group by Year
+      const byYear = {};
+      processed.forEach(p => {
+        const year = p.date.substring(0, 4);
+        if (!byYear[year]) byYear[year] = [];
+        byYear[year].push(p);
+      });
+
+      const years = Object.keys(byYear).sort();
+      
+      let prevYearLastRecord = null;
+
+      years.forEach(year => {
+        const recordsOfYear = byYear[year];
+        const lastRec = recordsOfYear[recordsOfYear.length - 1];
+        
+        // Calculate total aports in this year
+        let aportFondosYear = 0;
+        let aportStocksYear = 0;
+        recordsOfYear.forEach(r => {
+          aportFondosYear += r.aport;
+          aportStocksYear += r.stockAport;
+        });
+        const aportTotalYear = aportFondosYear + aportStocksYear;
+
+        // Base values (Start of year)
+        const startFondos = prevYearLastRecord ? prevYearLastRecord.realTotal : 0;
+        const startStocks = prevYearLastRecord ? prevYearLastRecord.stockTotal : 0;
+        const startTotalW = prevYearLastRecord ? prevYearLastRecord.totalWealth : 0;
+        const startMsci = prevYearLastRecord ? prevYearLastRecord.msciVal : 0;
+        const startSp500 = prevYearLastRecord ? prevYearLastRecord.sp500Val : 0;
+
+        // End values
+        const endFondos = lastRec.realTotal;
+        const endStocks = lastRec.stockTotal;
+        const endTotalW = lastRec.totalWealth;
+        const endMsci = lastRec.msciVal;
+        const endSp500 = lastRec.sp500Val;
+
+        // Calculate simplified annual return: (End - Start - Aports) / (Start + Aports)
+        // Note: This is an approximation (Modified Dietz without precise day weighting, but perfectly fine for yearly summary if aports are somewhat evenly distributed, or just a rough year-end metric).
+        const calcRet = (end, start, aport) => {
+          const invested = start + aport;
+          if (invested <= 0) return 0;
+          return ((end - invested) / invested) * 100;
+        };
+
+        const retFondos = calcRet(endFondos, startFondos, aportFondosYear);
+        const retStocks = calcRet(endStocks, startStocks, aportStocksYear);
+        const retTotalW = calcRet(endTotalW, startTotalW, aportTotalYear);
+        const retMsci = calcRet(endMsci, startMsci, aportFondosYear); // MSCI is benchmarked against Fondos aport
+        const retSp500 = calcRet(endSp500, startSp500, aportFondosYear); // SP500 is benchmarked against Fondos aport
+
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td class="text-bold">${year}</td>
+          <td>${fmtEur(aportTotalYear)}</td>
+          <td class="col-fondos"><span class="badge ${retFondos >= 0 ? 'badge-success' : 'badge-danger'}">${fmtPct(retFondos)}</span></td>
+          <td class="col-acciones"><span class="badge ${retStocks >= 0 ? 'badge-success' : 'badge-danger'}">${fmtPct(retStocks)}</span></td>
+          <td class="col-total"><span class="badge ${retTotalW >= 0 ? 'badge-success' : 'badge-danger'}">${fmtPct(retTotalW)}</span></td>
+          <td class="col-msci"><span class="badge ${retMsci >= 0 ? 'badge-success' : 'badge-danger'}">${fmtPct(retMsci)}</span></td>
+          <td class="col-sp500"><span class="badge ${retSp500 >= 0 ? 'badge-success' : 'badge-danger'}">${fmtPct(retSp500)}</span></td>
+        `;
+        tbody.appendChild(tr);
+
+        prevYearLastRecord = lastRec;
+      });
+    }
+
+    // Tabs Switcher
+    function switchTab(tabId, btn) {
+      document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+      document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
+
+      document.getElementById(tabId).classList.add('active');
+      btn.classList.add('active');
+    }
+
+    // Modal Operations (Record Date)
+    function openAddModal() {
+      document.getElementById('editIndex').value = "-1";
+      document.getElementById('modalTitle').innerText = "Añadir Registro (Cualquier Día)";
+      document.getElementById('recordForm').reset();
+      
+      renderDynamicAssetInputs({});
+
+      const todayStr = new Date().toISOString().slice(0, 10);
+      document.getElementById('inputDate').value = todayStr;
+      document.getElementById('inputStockAport').value = "0";
+      document.getElementById('inputStockTotal').value = "0";
+
+      if (records.length > 0) {
+        document.getElementById('inputMsciNav').value = records[records.length - 1].msciNav;
+        document.getElementById('inputSp500Nav').value = records[records.length - 1].sp500Nav || 16.42;
+      } else {
+        document.getElementById('inputSp500Nav').value = 16.42;
+      }
+
+      document.getElementById('modalForm').classList.add('active');
+    }
+
+    function openEditModal(index) {
+      const r = records[index];
+      document.getElementById('editIndex').value = index;
+      document.getElementById('modalTitle').innerText = `Editar Registro: ${fmtDateDisplay(r.date)}`;
+      
+      document.getElementById('inputDate').value = r.date;
+      document.getElementById('inputAport').value = r.aport;
+      document.getElementById('inputMsciNav').value = r.msciNav;
+      document.getElementById('inputSp500Nav').value = r.sp500Nav || 16.42;
+      document.getElementById('inputStockAport').value = r.stockAport || 0;
+      document.getElementById('inputStockTotal').value = r.stockTotal || 0;
+
+      renderDynamicAssetInputs(r.assets || {});
+
+      document.getElementById('modalForm').classList.add('active');
+    }
+
+    function renderDynamicAssetInputs(assetValuesMap) {
+      const container = document.getElementById('dynamicAssetInputs');
+      container.innerHTML = '';
+
+      assetsConfig.forEach(asset => {
+        const val = assetValuesMap[asset.id] !== undefined ? assetValuesMap[asset.id] : '';
+        const div = document.createElement('div');
+        div.className = 'form-group';
+        div.innerHTML = `
+          <label for="input_asset_${asset.id}">${asset.name} (${asset.target}%)</label>
+          <input type="number" step="0.01" id="input_asset_${asset.id}" class="form-control asset-val-input" data-asset-id="${asset.id}" value="${val}" placeholder="0.00" required>
+        `;
+        container.appendChild(div);
+      });
+    }
+
+    function closeModal() {
+      document.getElementById('modalForm').classList.remove('active');
+    }
+
+    function saveRecord(e) {
+      e.preventDefault();
+      const editIndex = parseInt(document.getElementById('editIndex').value);
+      
+      const assetInputs = document.querySelectorAll('.asset-val-input');
+      const assetsMap = {};
+      assetInputs.forEach(input => {
+        const id = input.getAttribute('data-asset-id');
+        assetsMap[id] = parseFloat(input.value) || 0;
+      });
+
+      const newRecord = {
+        date: document.getElementById('inputDate').value,
+        aport: parseFloat(document.getElementById('inputAport').value) || 0,
+        msciNav: parseFloat(document.getElementById('inputMsciNav').value) || 0,
+        sp500Nav: parseFloat(document.getElementById('inputSp500Nav').value) || 16.42,
+        stockAport: parseFloat(document.getElementById('inputStockAport').value) || 0,
+        stockTotal: parseFloat(document.getElementById('inputStockTotal').value) || 0,
+        assets: assetsMap
+      };
+
+      if (editIndex >= 0) {
+        records[editIndex] = newRecord;
+      } else {
+        records.push(newRecord);
+      }
+
+      records.sort((a, b) => a.date.localeCompare(b.date));
+
+      saveData();
+      renderAll();
+      closeModal();
+    }
+
+    function deleteRecord(index) {
+      if (confirm(`¿Estás seguro de eliminar el registro de ${fmtDateDisplay(records[index].date)}?`)) {
+        records.splice(index, 1);
+        saveData();
+        renderAll();
+      }
+    }
+
+    // Modal Operations (Asset Config)
+    function openAddAssetModal() {
+      document.getElementById('assetEditId').value = '';
+      document.getElementById('modalAssetTitle').innerText = 'Añadir Nuevo Fondo';
+      document.getElementById('assetConfigForm').reset();
+      document.getElementById('modalAsset').classList.add('active');
+    }
+
+    function openEditAssetModal(index) {
+      const asset = assetsConfig[index];
+      document.getElementById('assetEditId').value = asset.id;
+      document.getElementById('modalAssetTitle').innerText = `Editar Fondo: ${asset.name}`;
+      document.getElementById('assetNameInput').value = asset.name;
+      document.getElementById('assetIsinInput').value = asset.isin || '';
+      document.getElementById('assetTargetInput').value = asset.target;
+      document.getElementById('modalAsset').classList.add('active');
+    }
+
+    function closeAssetModal() {
+      document.getElementById('modalAsset').classList.remove('active');
+    }
+
+    function saveAssetConfig(e) {
+      e.preventDefault();
+      const editId = document.getElementById('assetEditId').value;
+      const name = document.getElementById('assetNameInput').value;
+      const isin = document.getElementById('assetIsinInput').value;
+      const target = parseFloat(document.getElementById('assetTargetInput').value) || 0;
+
+      if (editId) {
+        const asset = assetsConfig.find(a => a.id === editId);
+        if (asset) {
+          asset.name = name;
+          asset.isin = isin;
+          asset.target = target;
+        }
+      } else {
+        const newId = 'asset_' + Date.now();
+        assetsConfig.push({ id: newId, name, isin, target });
+      }
+
+      saveData();
+      renderAll();
+      closeAssetModal();
+    }
+
+    function deleteAsset(index) {
+      const asset = assetsConfig[index];
+      if (confirm(`¿Eliminar el fondo "${asset.name}" de la configuración?`)) {
+        assetsConfig.splice(index, 1);
+        saveData();
+        renderAll();
+      }
+    }
+
+    // JSON Backup Export / Import
+    function exportJSON() {
+      const backupData = {
+        assetsConfig,
+        records
+      };
+      const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(backupData, null, 2));
+      const downloadAnchor = document.createElement('a');
+      downloadAnchor.setAttribute("href", dataStr);
+      downloadAnchor.setAttribute("download", `inversiones_backup_${new Date().toISOString().slice(0,10)}.json`);
+      document.body.appendChild(downloadAnchor);
+      downloadAnchor.click();
+      downloadAnchor.remove();
+    }
+
+    function exportCSV() {
+      const processed = calculateProcessedData();
+      let csv = "Fecha,Aportacion,Total_Invertido,Cartera_Real,Ganancia_Real,Rent_Real_Pct,Sim_MSCI,Rent_MSCI_Pct,Sim_SP500,Rent_SP500_Pct\n";
+
+      processed.forEach(r => {
+        csv += `${r.date},${r.aport},${r.cumulativeInvested},${r.realTotal},${r.gainReal},${r.returnRealPct.toFixed(2)},${r.msciVal.toFixed(2)},${r.returnMsciPct.toFixed(2)},${r.sp500Val.toFixed(2)},${r.returnSp500Pct.toFixed(2)}\n`;
+      });
+
+      const dataStr = "data:text/csv;charset=utf-8," + encodeURIComponent(csv);
+      const downloadAnchor = document.createElement('a');
+      downloadAnchor.setAttribute("href", dataStr);
+      downloadAnchor.setAttribute("download", `inversiones_reporte_${new Date().toISOString().slice(0,10)}.csv`);
+      document.body.appendChild(downloadAnchor);
+      downloadAnchor.click();
+      downloadAnchor.remove();
+    }
+
+    function triggerImport() {
+      document.getElementById('importFile').click();
+    }
+
+    function importJSON(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        try {
+          const imported = JSON.parse(e.target.result);
+          if (imported.assetsConfig && imported.records) {
+            assetsConfig = imported.assetsConfig;
+            records = imported.records;
+          } else if (Array.isArray(imported)) {
+            records = imported;
+          }
+          saveData();
+          renderAll();
+          alert("¡Copia de seguridad importada correctamente!");
+        } catch (err) {
+          alert("Error al leer el archivo JSON de copia de seguridad.");
+        }
+      };
+      reader.readAsText(file);
+    }
+
+    function toggleTableCol(className, isVisible) {
+      const elements = document.querySelectorAll('#annualStatsTable .' + className);
+      elements.forEach(el => {
+        el.style.display = isVisible ? '' : 'none';
+      });
+    }
+
+    function resetChartZoom(cardId) {
+      if (cardId === 'cardPatrimony' && chartPatrimonyInstance) chartPatrimonyInstance.resetZoom();
+      if (cardId === 'cardReturn' && chartReturnInstance) chartReturnInstance.resetZoom();
+    }
+
+    function toggleFullscreen(cardId) {
+      const card = document.getElementById(cardId);
+      card.classList.toggle('fullscreen');
+      const btn = card.querySelector('.chart-header button:last-child');
+      if (card.classList.contains('fullscreen')) {
+        btn.innerHTML = '<i class="fa-solid fa-compress"></i> Cerrar';
+      } else {
+        btn.innerHTML = '<i class="fa-solid fa-expand"></i> Ampliar';
+        resetChartZoom(cardId);
+      }
+      // Force chart resize
+      if (cardId === 'cardPatrimony' && chartPatrimonyInstance) chartPatrimonyInstance.resize();
+      if (cardId === 'cardReturn' && chartReturnInstance) chartReturnInstance.resize();
+    }
+  </script>
+</body>
+</html>
