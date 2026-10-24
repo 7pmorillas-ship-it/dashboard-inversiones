@@ -6,6 +6,9 @@
 backup*/
 _archivo/
 
+# Copias del HTML antes de cambios grandes (no publicar: son un duplicado servido por Pages)
+index.backup-*.html
+
 # Sistema
 .DS_Store
 Thumbs.db

@@ -25,6 +25,19 @@ Dashboard personal en un único `index.html` autocontenido: cartera MyInvestor +
 
 Abrir el fichero en local con `file://` **no** sincroniza: el navegador bloquea el `fetch` desde `file://`.
 
+## Cuentas, registros parciales y objetivos (2026-10)
+
+- Cada activo pertenece a una **cuenta** (`pillar`): `myinvestor` o `crypto`. Trading 212 es una cuenta suelta, no un activo, y su peso objetivo vive en `appSettings.stockTarget`.
+- Un registro puede **actualizar solo una cuenta**. Los activos que no se informan se **arrastran** desde el último valor conocido en `calculateProcessedData()`.
+- Aportaciones desglosadas en `record.flows = { myinvestor, crypto, t212 }`. `record.aport` sigue guardándose como suma (`myinvestor + crypto`) para no alterar los benchmarks ni los KPI existentes.
+- Registros antiguos sin `flows`: toda la aportación se atribuye a fondos, y desde el segundo registro se reparte de forma proporcional al peso previo de fondos/cripto.
+- Objetivos con auto-ajuste: al cambiar un `%` el resto se reparte proporcionalmente hasta sumar 100. `locked` fija una fila. `order` guarda el orden de arrastre.
+- Ajustes locales en `localStorage['inversiones_settings_v1']` y dentro del payload cifrado (`settings`). Compatible hacia atrás: un payload sin `settings` usa los valores por defecto.
+
+## Pestaña Riesgo & Comparativa
+
+Métricas calculadas con los registros y el calendario real: TWR (índice encadenado ajustado por flujos), retorno total, TIR/XIRR (bisección), volatilidad anualizada, Sharpe (tasa libre de riesgo 2 %), máximo drawdown y beta frente al MSCI World. Columnas: cartera total, MyInvestor, Cripto, Trading 212, MSCI World y S&P 500. El retorno anual y el Sharpe solo se muestran con al menos 6 meses de histórico.
+
 ## Migración desde el formato antiguo (en claro)
 
 Si el JSON remoto todavía no tiene `v: 2`, la página detecta el formato antiguo, pide un PIN (dos veces, mínimo 6 caracteres) y guarda una versión cifrada. Hasta que se hace esa migración, los datos siguen en claro en la nube.

@@ -693,6 +693,138 @@
     .chart-card.fullscreen canvas:active {
       cursor: grabbing;
     }
+
+    /* ===== Registros parciales: chips de cuenta ===== */
+    .pillar-chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-bottom: 16px;
+    }
+    .chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 7px 14px;
+      border-radius: 999px;
+      border: 1px solid var(--border-color);
+      background: var(--bg-body);
+      color: var(--text-muted);
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all .15s;
+      user-select: none;
+    }
+    .chip:hover { border-color: var(--primary); }
+    .chip.active {
+      background: var(--primary);
+      border-color: var(--primary);
+      color: #fff;
+    }
+    .chip .chip-dot {
+      width: 8px; height: 8px; border-radius: 50%;
+      background: currentColor; opacity: .8;
+    }
+    .modal-section {
+      border: 1px solid var(--border-color);
+      border-radius: 10px;
+      padding: 12px 14px 4px;
+      margin-bottom: 14px;
+      background: var(--bg-body);
+    }
+    .modal-section-title {
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: .06em;
+      color: var(--text-muted);
+      margin-bottom: 8px;
+    }
+    .modal-section.hidden { display: none; }
+
+    /* ===== Gestión de objetivos ===== */
+    .target-input {
+      width: 74px;
+      padding: 4px 6px;
+      text-align: right;
+      border: 1px solid var(--border-color);
+      border-radius: 6px;
+      background: var(--bg-card);
+      color: var(--text-main);
+      font-family: inherit;
+      font-size: 13px;
+      font-weight: 600;
+    }
+    .target-input:focus { outline: none; border-color: var(--primary); }
+    .drag-handle {
+      cursor: grab;
+      color: var(--text-muted);
+      padding: 0 4px;
+    }
+    .drag-handle:active { cursor: grabbing; }
+    .asset-row.dragging { opacity: .45; }
+    .asset-row.drag-over { box-shadow: inset 0 2px 0 var(--primary); }
+    .asset-row.locked .target-input { opacity: .55; }
+    .lock-btn {
+      background: none; border: none; cursor: pointer;
+      color: var(--text-muted); font-size: 13px; padding: 2px 4px;
+    }
+    .lock-btn.on { color: var(--primary); }
+    .pillar-tag {
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: .04em;
+      padding: 2px 6px;
+      border-radius: 4px;
+      background: rgba(79, 70, 229, .1);
+      color: var(--primary);
+      white-space: nowrap;
+    }
+    .target-toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 12px;
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--border-color);
+    }
+    .target-toolbar .spacer { flex: 1; }
+    .sum-pill {
+      font-weight: 700;
+      font-size: 13px;
+      padding: 4px 10px;
+      border-radius: 999px;
+      background: rgba(22, 163, 74, .12);
+      color: #16a34a;
+    }
+    .sum-pill.bad {
+      background: rgba(220, 38, 38, .12);
+      color: #dc2626;
+    }
+    .btn-xs {
+      padding: 5px 10px;
+      font-size: 12px;
+      border-radius: 6px;
+      border: 1px solid var(--border-color);
+      background: var(--bg-card);
+      color: var(--text-main);
+      cursor: pointer;
+      font-weight: 600;
+    }
+    .btn-xs:hover { border-color: var(--primary); color: var(--primary); }
+
+    /* ===== Tabla de riesgo ===== */
+    .risk-table th, .risk-table td { text-align: right; }
+    .risk-table th:first-child, .risk-table td:first-child { text-align: left; }
+    .risk-table td strong { font-weight: 700; }
+    .metric-note {
+      font-size: 12px;
+      line-height: 1.6;
+      color: var(--text-muted);
+      margin-top: 12px;
+    }
   </style>
 </head>
 <body>
@@ -844,8 +976,11 @@
       <button class="tab-btn" onclick="switchTab('tab-rebalance', this)">
         <i class="fa-solid fa-calculator"></i> Calculadora Rebalanceo
       </button>
+      <button class="tab-btn" onclick="switchTab('tab-risk', this)">
+        <i class="fa-solid fa-gauge-high"></i> Riesgo & Comparativa
+      </button>
       <button class="tab-btn" onclick="switchTab('tab-assets-config', this)">
-        <i class="fa-solid fa-sliders"></i> Gestionar Fondos & Activos
+        <i class="fa-solid fa-sliders"></i> Objetivos & Activos
       </button>
       <button class="tab-btn" onclick="switchTab('tab-annual', this)">
         <i class="fa-solid fa-calendar-check"></i> Estadísticas Anuales
@@ -992,25 +1127,77 @@
       </div>
     </div>
 
+    <!-- Tab: Riesgo & Comparativa -->
+    <div id="tab-risk" class="tab-content">
+      <div class="table-card" style="margin-bottom: 24px;">
+        <div class="chart-header">
+          <div class="chart-title">
+            <h3>Métricas de riesgo frente a benchmarks</h3>
+            <p>Calculadas con tus registros y el calendario real entre fechas</p>
+          </div>
+        </div>
+        <div class="table-wrapper">
+          <table class="risk-table">
+            <thead>
+              <tr id="riskTableHead"></tr>
+            </thead>
+            <tbody id="riskTableBody"></tbody>
+          </table>
+        </div>
+        <p class="metric-note">
+          <strong>TWR</strong> retorno anual encadenado, sin el efecto de tus aportaciones.
+          <strong>TIR</strong> rentabilidad real de tu dinero, ponderando cuándo entró cada euro.
+          <strong>Volatilidad</strong> desviación anualizada de los retornos diarios.
+          <strong>Sharpe</strong> retorno extra por unidad de riesgo (tasa libre de riesgo 2 %).
+          <strong>Máx. caída</strong> el peor descenso desde un máximo.
+          <strong>Beta</strong> sensibilidad frente al MSCI World (1 = se mueve igual).
+          Todo se calcula con valores arrastrados cuando un registro no actualiza un activo, y con <em>—</em> si aún no hay datos suficientes. El retorno anual y el Sharpe necesitan al menos 6 meses de histórico; el total y la TIR salen desde el primer día.
+        </p>
+      </div>
+      <div class="table-card">
+        <div class="chart-header">
+          <div class="chart-title">
+            <h3>Caída desde máximos (drawdown)</h3>
+            <p>Tu cartera total frente a MSCI World y S&amp;P 500</p>
+          </div>
+        </div>
+        <div class="chart-container" style="height: 300px;">
+          <canvas id="chartDrawdown"></canvas>
+        </div>
+      </div>
+    </div>
+
     <!-- Tab 4: Assets Config (Añadir/Quitar activos) -->
     <div id="tab-assets-config" class="tab-content">
       <div class="table-card">
         <div class="chart-header">
           <div class="chart-title">
-            <h3>Gestión de Fondos y Pesos Objetivos</h3>
-            <p>Añade, modifica o elimina fondos de tu lista de seguimiento</p>
+            <h3>Objetivos, orden y cuentas</h3>
+            <p>Arrastra las filas para ordenar, edita un % y el resto se recoloca solo hasta sumar 100</p>
           </div>
           <button class="btn btn-primary" onclick="openAddAssetModal()">
-            <i class="fa-solid fa-plus"></i> Añadir Nuevo Fondo
+            <i class="fa-solid fa-plus"></i> Añadir Activo
           </button>
+        </div>
+        <div class="target-toolbar">
+          <span class="chip active" id="autoTargetChip" onclick="toggleAutoTargets()">
+            <i class="fa-solid fa-wand-magic-sparkles"></i> Auto-ajustar a 100 %
+          </span>
+          <span class="sum-pill" id="targetSumPill">100,0 %</span>
+          <button class="btn-xs" onclick="normalizeTargets()">Normalizar ahora</button>
+          <span class="spacer"></span>
+          <span class="text-muted" style="font-size:12px;">El candado fija ese % y lo excluye del reparto</span>
         </div>
         <div class="table-wrapper">
           <table>
             <thead>
               <tr>
-                <th>Nombre del Fondo / Activo</th>
+                <th style="width: 34px;"></th>
+                <th>Activo / Cuenta</th>
+                <th>Cuenta</th>
                 <th>ISIN / Ticker</th>
-                <th>Peso Objetivo (%)</th>
+                <th style="text-align: right;">Objetivo (%)</th>
+                <th style="width: 40px; text-align: center;">Fijar</th>
                 <th>Acciones</th>
               </tr>
             </thead>
@@ -1019,9 +1206,9 @@
             </tbody>
             <tfoot>
               <tr style="background: #f8fafc; font-weight: 700;">
-                <td colspan="2">TOTAL OBJETIVO:</td>
-                <td id="totalTargetWeightCell">100.0%</td>
-                <td></td>
+                <td colspan="4">TOTAL OBJETIVO:</td>
+                <td id="totalTargetWeightCell" style="text-align: right;">100,0 %</td>
+                <td colspan="2"></td>
               </tr>
             </tfoot>
           </table>
@@ -1135,6 +1322,22 @@
       </div>
 
       <div class="guide-card">
+        <h3><i class="fa-solid fa-layer-group"></i> 2b. Registrar solo una cuenta (MyInvestor, Trading 212 o Cripto)</h3>
+        <p>No hace falta rellenar todo cada vez. En el formulario de registro:</p>
+        <ul>
+          <li>Los chips de arriba ocultan la cuenta que hoy no toques, para no perderte entre campos.</li>
+          <li>Los valores vienen <strong>precargados con el último dato conocido</strong>. Si dejas un campo como está, se guarda igual.</li>
+          <li>Si prefieres no repetirlo, bórralo: un campo vacío se rellena solo con el último valor del activo. Así puedes meter solo la cripto o solo las acciones.</li>
+          <li>La aportación va separada por cuenta (fondos, acciones y cripto), para que la pestaña de riesgo calcule bien la rentabilidad de cada una.</li>
+        </ul>
+      </div>
+
+      <div class="guide-card">
+        <h3><i class="fa-solid fa-wand-magic-sparkles"></i> 2c. Objetivos que se ajustan solos</h3>
+        <p>En <strong>Objetivos &amp; Activos</strong>, cambia un porcentaje y el resto se recoloca proporcionalmente para que el total siga siendo 100 %. Con el candado fijas los que no quieres que se muevan. Arrastrando la fila cambias el orden en el que aparecen en toda la app.</p>
+      </div>
+
+      <div class="guide-card">
         <h3><i class="fa-solid fa-globe"></i> 3. ¿Cómo funciona la comparativa contra MSCI World y S&P 500?</h3>
         <p>Para medir si tu diversificación añade valor real respecto a simplemente comprar un índice global o estadounidense, la app utiliza una **cartera simétrica virtual**:</p>
         <ul>
@@ -1145,7 +1348,7 @@
 
       <div class="guide-card">
         <h3><i class="fa-solid fa-calculator"></i> 4. Calculadora de Rebalanceo Inteligente</h3>
-        <p>En la pestaña **`Calculadora Rebalanceo`**, introduce los euros que vas a aportar este mes (por ejemplo, 300 €). La calculadora analizará qué fondos están más por debajo de su porcentaje objetivo y te sugerirá exactamente cuánto dinero asignar a cada uno para mantener tu cartera equilibrada sin realizar ventas.</p>
+        <p>En la pestaña **`Calculadora Rebalanceo`**, introduce los euros que vas a aportar este mes (por ejemplo, 300 €). La calculadora mira el peso real de cada activo <em>y de la cuenta de Trading 212</em> frente a su objetivo, y reparte la aportación dando prioridad a lo que está más por debajo. Sin vender nada.</p>
       </div>
     </div>
   </div>
@@ -1162,50 +1365,74 @@
           <input type="hidden" id="editIndex" value="-1">
 
           <!-- Section 1: General -->
-          <div class="form-section-title">1. Fecha Exacta, Aportación & Precios Benchmark</div>
-          <div class="form-grid">
+                    <div class="pillar-chips" id="pillarChips">
+            <span class="chip active" data-pillar="myinvestor" onclick="togglePillarBlock('myinvestor')"><span class="chip-dot"></span> MyInvestor</span>
+            <span class="chip active" data-pillar="t212" onclick="togglePillarBlock('t212')"><span class="chip-dot"></span> Trading 212</span>
+            <span class="chip active" data-pillar="crypto" onclick="togglePillarBlock('crypto')"><span class="chip-dot"></span> Cripto</span>
+          </div>
+          <p class="metric-note" style="margin: 0 0 14px;">
+            Oculta con los chips la cuenta que hoy no toques. Lo que no cambies sigue contando: los valores se precargan con el último registro.
+          </p>
+
+          <div class="form-group" style="margin-bottom: 14px;">
+            <label for="inputDate">Fecha Exacta</label>
+            <input type="date" id="inputDate" class="form-control" required>
+          </div>
+
+          <div class="modal-section" id="block-myinvestor">
+            <div class="modal-section-title">MyInvestor · Fondos</div>
+            <div class="form-grid">
             <div class="form-group">
-              <label for="inputDate">Fecha Exacta</label>
-              <input type="date" id="inputDate" class="form-control" required>
-            </div>
-            <div class="form-group">
-              <label for="inputAport">Aportación Nueva (€)</label>
-              <input type="number" step="0.01" id="inputAport" class="form-control" placeholder="Ej: 300.00" required>
+              <label for="inputAport">Aportación a Fondos (€)</label>
+              <input type="number" step="0.01" id="inputAport" class="form-control" placeholder="0.00">
             </div>
             <div class="form-group">
               <label for="inputMsciNav">
                 Precio iShares Dev World 
                 <a href="https://www.finect.com/fondos-inversion/IE000ZYRH0Q7" target="_blank" title="Mirar en Finect" style="color: var(--primary); text-decoration: none; margin-left: 4px;"><i class="fa-solid fa-arrow-up-right-from-square"></i></a>
               </label>
-              <input type="number" step="0.0001" id="inputMsciNav" class="form-control" placeholder="Ej: 12.25" required>
+              <input type="number" step="0.0001" id="inputMsciNav" class="form-control" placeholder="Ej: 12.25">
             </div>
             <div class="form-group">
               <label for="inputSp500Nav">
                 Fidelity S&P 500 
                 <a href="https://www.finect.com/fondos-inversion/IE00BYX5MX67" target="_blank" title="Mirar en Finect" style="color: var(--primary); text-decoration: none; margin-left: 4px;"><i class="fa-solid fa-arrow-up-right-from-square"></i></a>
               </label>
-              <input type="number" step="0.0001" id="inputSp500Nav" class="form-control" placeholder="Ej: 16.42" required>
+              <input type="number" step="0.0001" id="inputSp500Nav" class="form-control" placeholder="Ej: 16.42">
+            </div>
+            </div>
+            <div class="form-grid" id="fundsInputs">
+              <!-- Generado dinámicamente -->
             </div>
           </div>
 
-
           <!-- Section 1.5: Cartera de Acciones -->
-          <div class="form-section-title">1.5. Cartera de Acciones Propias (Opcional)</div>
-          <div class="form-grid">
+          <div class="modal-section" id="block-t212">
+            <div class="modal-section-title">Trading 212 · Acciones</div>
+            <div class="form-grid">
             <div class="form-group">
               <label for="inputStockAport">Dinero Añadido a Acciones (€)</label>
-              <input type="number" step="0.01" id="inputStockAport" class="form-control" placeholder="Ej: 150.00" value="0">
+              <input type="number" step="0.01" id="inputStockAport" class="form-control" placeholder="0.00">
             </div>
             <div class="form-group">
               <label for="inputStockTotal">Valor Total Cartera Acciones (€)</label>
-              <input type="number" step="0.01" id="inputStockTotal" class="form-control" placeholder="Ej: 1250.00" value="0">
+              <input type="number" step="0.01" id="inputStockTotal" class="form-control" placeholder="Ej: 1250.00">
+            </div>
             </div>
           </div>
 
-          <!-- Section 2: Asset Positions -->
-          <div class="form-section-title">2. Valor de Posición por Fondo / Activo (€)</div>
-          <div class="form-grid" id="dynamicAssetInputs">
-            <!-- Generated dynamically -->
+          <!-- Cripto -->
+          <div class="modal-section" id="block-crypto">
+            <div class="modal-section-title">Cripto</div>
+            <div class="form-grid">
+              <div class="form-group">
+                <label for="inputCryptoAport">Aportación a Cripto (€)</label>
+                <input type="number" step="0.01" id="inputCryptoAport" class="form-control" placeholder="0.00">
+              </div>
+            </div>
+            <div class="form-grid" id="cryptoInputs">
+              <!-- Generado dinámicamente -->
+            </div>
           </div>
         </div>
 
@@ -1239,10 +1466,17 @@
             <label for="assetTargetInput">Peso Objetivo (%)</label>
             <input type="number" step="0.1" id="assetTargetInput" class="form-control" placeholder="Ej: 5.0" required>
           </div>
+          <div class="form-group">
+            <label for="assetPillarInput">Cuenta</label>
+            <select id="assetPillarInput" class="form-control">
+              <option value="myinvestor">MyInvestor</option>
+              <option value="crypto">Cripto</option>
+            </select>
+          </div>
         </div>
         <div class="modal-footer">
           <button type="button" class="btn btn-secondary" onclick="closeAssetModal()">Cancelar</button>
-          <button type="submit" class="btn btn-primary"><i class="fa-solid fa-save"></i> Guardar Fondo</button>
+          <button type="submit" class="btn btn-primary"><i class="fa-solid fa-save"></i> Guardar Activo</button>
         </div>
       </form>
     </div>
@@ -1315,7 +1549,7 @@
       { id: "gold_etc", name: "iShares Physical Gold ETC", isin: "IE00B4ND3602 / PPFB GR", target: 8.0 },
       { id: "vanguard_small", name: "Vanguard Global Small-Cap Index Fund Eur Acc", isin: "IE00B42W3509", target: 8.0 },
       { id: "axa_cash", name: "AXA Trésor Court Terme C", isin: "FR0000447823", target: 8.0 },
-      { id: "crypto", name: "Criptoactivos", isin: "-", target: 4.0 }
+      { id: "crypto", name: "Criptoactivos", isin: "-", target: 4.0, pillar: "crypto" }
     ];
 
     // Arranque neutro: las cifras reales solo llegan descifradas desde la nube.
@@ -1338,6 +1572,52 @@
     let currentFilterPeriod = 'ALL';
     let filterStartMonth = '';
     let filterEndMonth = '';
+
+    // ================= CUENTAS (pilares) Y AJUSTES LOCALES =================
+    // Cada activo pertenece a una cuenta. Trading 212 es una cuenta suelta
+    // (no un activo) y su objetivo vive aquí, así entra en el 100 %.
+    const PILLARS = {
+      myinvestor: { name: 'MyInvestor', color: '#4f46e5' },
+      t212: { name: 'Trading 212', color: '#0ea5e9' },
+      crypto: { name: 'Cripto', color: '#f59e0b' }
+    };
+    let appSettings = { stockTarget: 0, stockLocked: false, autoTargets: true };
+
+    function assetPillar(a) {
+      if (a.pillar) return a.pillar;
+      if (a.id === 'crypto' || /cripto/i.test(a.name || '')) return 'crypto';
+      return 'myinvestor';
+    }
+
+    // Compatibilidad: rellena pillar/order/locked en configuraciones antiguas.
+    function normalizeConfig() {
+      assetsConfig.forEach((a, i) => {
+        a.pillar = assetPillar(a);
+        if (typeof a.order !== 'number') a.order = i;
+        if (typeof a.locked !== 'boolean') a.locked = false;
+      });
+      assetsConfig.sort((x, y) => x.order - y.order);
+      assetsConfig.forEach((a, i) => { a.order = i; });
+    }
+
+    function totalTargetWeight() {
+      return assetsConfig.reduce((s, a) => s + (Number(a.target) || 0), 0) + (Number(appSettings.stockTarget) || 0);
+    }
+
+    function loadSettings() {
+      try {
+        const raw = localStorage.getItem('inversiones_settings_v1');
+        if (raw) appSettings = Object.assign({}, appSettings, JSON.parse(raw));
+      } catch (e) { }
+      if (typeof appSettings.stockTarget !== 'number' || isNaN(appSettings.stockTarget)) appSettings.stockTarget = 0;
+      if (typeof appSettings.autoTargets !== 'boolean') appSettings.autoTargets = true;
+      if (typeof appSettings.stockLocked !== 'boolean') appSettings.stockLocked = false;
+    }
+
+    function saveSettings() {
+      localStorage.setItem('inversiones_settings_v1', JSON.stringify(appSettings));
+      if (isUnlocked && cloudSyncEnabled && typeof pushToCloud === 'function') pushToCloud();
+    }
 
     let chartPatrimonyInstance = null;
     let chartReturnInstance = null;
@@ -1401,6 +1681,11 @@
       if (!payload) return;
       if (payload.records && Array.isArray(payload.records)) records = payload.records;
       if (payload.assetsConfig && Array.isArray(payload.assetsConfig)) assetsConfig = payload.assetsConfig;
+      if (payload.settings && typeof payload.settings === 'object') {
+        appSettings = Object.assign({}, appSettings, payload.settings);
+        localStorage.setItem('inversiones_settings_v1', JSON.stringify(appSettings));
+      }
+      normalizeConfig();
       localStorage.setItem('inversiones_assets_v8', JSON.stringify(assetsConfig));
       localStorage.setItem('inversiones_records_v8', JSON.stringify(records));
     }
@@ -1561,6 +1846,8 @@
       } else {
         assetsConfig = JSON.parse(JSON.stringify(DEFAULT_ASSETS));
       }
+      loadSettings();
+      normalizeConfig();
 
       const savedRecords = localStorage.getItem('inversiones_records_v8');
       if (savedRecords) {
@@ -1656,7 +1943,7 @@
       }
       updateCloudBadgeStatus('syncing');
       try {
-        const payloadObj = { assetsConfig, records, lastUpdate: new Date().toISOString() };
+        const payloadObj = { assetsConfig, records, settings: appSettings, lastUpdate: new Date().toISOString() };
         const envelope = await encryptCloud(payloadObj);
         saveEnvelopeLocally(envelope);
 
@@ -1813,9 +2100,198 @@
     }
 
     // Master Calculations Engine with Exact Day Time Differences
+    // ================= REGISTROS PARCIALES Y MÉTRICAS =================
+    // Aportaciones por cuenta. Los registros antiguos no tienen `flows`:
+    // se interpretan como que toda la aportación iba a fondos.
+    function recordFlows(r) {
+      if (r.flows && typeof r.flows === 'object') {
+        return {
+          funds: parseFloat(r.flows.myinvestor) || 0,
+          crypto: parseFloat(r.flows.crypto) || 0,
+          t212: parseFloat(r.flows.t212) || 0
+        };
+      }
+      return { funds: parseFloat(r.aport) || 0, crypto: 0, t212: parseFloat(r.stockAport) || 0 };
+    }
+
+    const RISK_FREE_RATE = 0.02;
+
+    function daysBetween(a, b) { return (new Date(b) - new Date(a)) / 86400000; }
+
+    // Índice TWR (100 = inicio): encadena retornos quitando el efecto de las aportaciones.
+    function buildTwrSeries(points) {
+      const out = [];
+      if (!points.length) return out;
+      let idx = 100;
+      out.push({ date: points[0].date, value: 100 });
+      for (let i = 1; i < points.length; i++) {
+        const prev = points[i - 1].value;
+        const flow = points[i].flow || 0;
+        let r = 0;
+        if (prev > 0) r = (points[i].value - flow) / prev - 1;
+        if (!isFinite(r) || r < -1) r = -1;
+        const next = idx * (1 + r);
+        if (next > 0) idx = next;
+        out.push({ date: points[i].date, value: idx });
+      }
+      return out;
+    }
+
+    // TIR (XIRR) por bisección: robusta y suficiente para cashflows pequeños.
+    function xirr(cashflows) {
+      if (!cashflows || cashflows.length < 2) return null;
+      if (!cashflows.some(c => c.amount > 0) || !cashflows.some(c => c.amount < 0)) return null;
+      const t0 = new Date(cashflows[0].date).getTime();
+      const years = (d) => (new Date(d).getTime() - t0) / (365.25 * 86400000);
+      const npv = (rate) => cashflows.reduce((s, c) => s + c.amount / Math.pow(1 + rate, years(c.date)), 0);
+      let lo = -0.95, hi = 5.0;
+      let flo = npv(lo), fhi = npv(hi);
+      if (!isFinite(flo) || !isFinite(fhi) || flo * fhi > 0) return null;
+      for (let i = 0; i < 80; i++) {
+        const mid = (lo + hi) / 2;
+        const fm = npv(mid);
+        if (flo * fm <= 0) { hi = mid; fhi = fm; } else { lo = mid; flo = fm; }
+      }
+      return (lo + hi) / 2;
+    }
+
+    function cashflowsFor(processed, flowOf, finalValue, firstValue) {
+      const cfs = [];
+      // Capital inicial asumido = valor del primer registro menos lo aportado ese mismo día
+      const firstFlow = flowOf(processed[0]) || 0;
+      const initCapital = Math.max(0, (firstValue || 0) - firstFlow);
+      if (initCapital > 0) cfs.push({ date: processed[0].date, amount: -initCapital });
+      processed.forEach(p => {
+        const amount = -(flowOf(p) || 0);
+        if (Math.abs(amount) > 0.004) cfs.push({ date: p.date, amount: amount });
+      });
+      if (!(finalValue > 0)) return [];
+      cfs.push({ date: processed[processed.length - 1].date, amount: finalValue });
+      return cfs;
+    }
+
+    function metricsFromSeries(serie, cashflows) {
+      const empty = { ret: null, cagr: null, vol: null, sharpe: null, maxDD: null, tir: null };
+      if (!serie || serie.length < 2) return empty;
+      const n = serie.length;
+      const total = serie[n - 1].value / serie[0].value;
+      const years = daysBetween(serie[0].date, serie[n - 1].date) / 365.25;
+      const cagr = (years >= 0.5 && total > 0) ? Math.pow(total, 1 / years) - 1 : null;
+
+      const daily = [];
+      for (let i = 1; i < n; i++) {
+        const d = daysBetween(serie[i - 1].date, serie[i].date);
+        const rr = serie[i].value / serie[i - 1].value;
+        if (d > 0 && rr > 0) daily.push(Math.pow(rr, 1 / d) - 1);
+      }
+      let vol = null;
+      if (daily.length >= 2) {
+        const mean = daily.reduce((a, b) => a + b, 0) / daily.length;
+        const varc = daily.reduce((a, b) => a + (b - mean) * (b - mean), 0) / (daily.length - 1);
+        vol = Math.sqrt(varc) * Math.sqrt(365);
+      }
+      const sharpe = (cagr != null && vol > 0) ? (cagr - RISK_FREE_RATE) / vol : null;
+
+      let peak = serie[0].value, maxDD = 0;
+      serie.forEach(p => {
+        if (p.value > peak) peak = p.value;
+        const dd = peak > 0 ? p.value / peak - 1 : 0;
+        if (dd < maxDD) maxDD = dd;
+      });
+
+      return {
+        ret: total - 1,
+        cagr: cagr,
+        vol: vol,
+        sharpe: sharpe,
+        maxDD: maxDD,
+        tir: xirr(cashflows)
+      };
+    }
+
+    function intervalReturns(serie) {
+      const out = [];
+      for (let i = 1; i < serie.length; i++) {
+        const prev = serie[i - 1].value;
+        out.push(prev > 0 ? serie[i].value / prev - 1 : 0);
+      }
+      return out;
+    }
+
+    function betaOf(serieA, serieB) {
+      const a = intervalReturns(serieA), b = intervalReturns(serieB);
+      const n = Math.min(a.length, b.length);
+      if (n < 3) return null;
+      const ma = a.slice(0, n).reduce((x, y) => x + y, 0) / n;
+      const mb = b.slice(0, n).reduce((x, y) => x + y, 0) / n;
+      let cov = 0, varb = 0;
+      for (let i = 0; i < n; i++) {
+        cov += (a[i] - ma) * (b[i] - mb);
+        varb += (b[i] - mb) * (b[i] - mb);
+      }
+      if (varb === 0) return null;
+      return cov / varb;
+    }
+
+    // Construye todo lo que necesita la pestaña de riesgo.
+    function computeRisk(processed) {
+      if (!processed || processed.length === 0) return null;
+      const pick = (valueOf, flowOf) => {
+        const pts = processed.map(p => ({
+          date: p.date, value: valueOf(p) || 0, flow: flowOf(p) || 0
+        }));
+        // Cuenta sin dinero: sin datos, no 0 %
+        if (!pts.some(p => p.value > 0)) return [];
+        return buildTwrSeries(pts);
+      };
+      const last = processed[processed.length - 1];
+
+      const sTotal = pick(p => p.totalWealth, p => (p.flows.funds + p.flows.crypto + p.flows.t212));
+      const sFunds = pick(p => p.fundsValue, p => p.flows.funds);
+      const sCrypto = pick(p => p.cryptoValue, p => p.flows.crypto);
+      const sStock = pick(p => p.stockTotal, p => p.flows.t212);
+      const sMsci = pick(p => p.msciVal, p => p.aport);
+      const sSp = pick(p => p.sp500Val, p => p.aport);
+
+      const mTotal = metricsFromSeries(sTotal, cashflowsFor(processed, p => p.flows.funds + p.flows.crypto + p.flows.t212, last.totalWealth, processed[0].totalWealth));
+      const mFunds = metricsFromSeries(sFunds, cashflowsFor(processed, p => p.flows.funds, last.fundsValue, processed[0].fundsValue));
+      const mCrypto = metricsFromSeries(sCrypto, cashflowsFor(processed, p => p.flows.crypto, last.cryptoValue, processed[0].cryptoValue));
+      const mStock = metricsFromSeries(sStock, cashflowsFor(processed, p => p.flows.t212, last.stockTotal, processed[0].stockTotal));
+      const mMsci = metricsFromSeries(sMsci, cashflowsFor(processed, p => p.aport, last.msciVal, processed[0].msciVal));
+      const mSp = metricsFromSeries(sSp, cashflowsFor(processed, p => p.aport, last.sp500Val, processed[0].sp500Val));
+
+      const drawdown = (serie) => {
+        let peak = serie.length ? serie[0].value : 0;
+        return serie.map(p => {
+          if (p.value > peak) peak = p.value;
+          return peak > 0 ? (p.value / peak - 1) * 100 : 0;
+        });
+      };
+
+      const beta = (serie) => betaOf(serie, sMsci);
+
+      return {
+        labels: processed.map(p => p.date),
+        columns: [
+          { key: 'total', name: 'Tu cartera', m: mTotal, series: sTotal, beta: beta(sTotal) },
+          { key: 'funds', name: 'MyInvestor', m: mFunds, series: sFunds, beta: beta(sFunds) },
+          { key: 'crypto', name: 'Cripto', m: mCrypto, series: sCrypto, beta: beta(sCrypto) },
+          { key: 't212', name: 'Trading 212', m: mStock, series: sStock, beta: beta(sStock) },
+          { key: 'msci', name: 'MSCI World', m: mMsci, series: sMsci, beta: 1 },
+          { key: 'sp500', name: 'S&P 500', m: mSp, series: sSp, beta: beta(sSp) }
+        ],
+        drawdown: {
+          total: drawdown(sTotal),
+          msci: drawdown(sMsci),
+          sp500: drawdown(sSp)
+        }
+      };
+    }
+
     function calculateProcessedData() {
       let cumulativeInvested = 0;
       let cumulativeInvestedStock = 0;
+      let cumulativeInvestedCrypto = 0;
       let msciShares = 0;
       let sp500Shares = 0;
       let target5Val = 0;
@@ -1824,21 +2300,67 @@
       const dailyFactor5 = Math.pow(1 + 0.05, 1 / 365.25);
       const dailyFactor9 = Math.pow(1 + 0.09, 1 / 365.25);
 
+      // Registros parciales: el último valor conocido de cada activo se arrastra
+      // hasta que un registro vuelva a informarlo.
+      let lastAssets = {};
+      let lastStockTotal = 0;
+      let lastMsciNav = 0;
+      let lastSp500Nav = 0;
+      let lastFundsValue = 0;
+      let lastCryptoValue = 0;
+
       const allProcessed = records.map((r, index) => {
-        cumulativeInvested += r.aport;
-        const sAport = r.stockAport || 0;
-        const sTotal = r.stockTotal || 0;
+        const flows = recordFlows(r);
+        // Registros antiguos sin desglose: la aportación se reparte entre fondos
+        // y cripto según el peso que tenían en el registro anterior.
+        if (!r.flows && flows.funds > 0 && (lastFundsValue + lastCryptoValue) > 0) {
+          const base = lastFundsValue + lastCryptoValue;
+          const cryptoPart = Math.round(flows.funds * (lastCryptoValue / base) * 100) / 100;
+          flows.crypto = cryptoPart;
+          flows.funds = Math.round((flows.funds - cryptoPart) * 100) / 100;
+        }
+        const aportTotal = flows.funds + flows.crypto;
+        cumulativeInvested += aportTotal;
+        cumulativeInvestedCrypto += flows.crypto;
+        const sAport = flows.t212;
+        const hasStockTotal = (r.stockTotal !== undefined && r.stockTotal !== null && r.stockTotal !== '');
+        const sTotal = hasStockTotal ? (parseFloat(r.stockTotal) || 0) : lastStockTotal;
+        lastStockTotal = sTotal;
         cumulativeInvestedStock += sAport;
 
-        // Portfolio real total
-        let realTotal = 0;
+        // Valores efectivos (arrastre)
+        const effectiveAssets = Object.assign({}, lastAssets);
         if (r.assets && typeof r.assets === 'object') {
-          Object.values(r.assets).forEach(val => { realTotal += parseFloat(val) || 0; });
+          Object.keys(r.assets).forEach(k => {
+            const v = parseFloat(r.assets[k]);
+            if (!isNaN(v)) effectiveAssets[k] = v;
+          });
         }
+        lastAssets = Object.assign({}, effectiveAssets);
+
+        let realTotal = 0;
+        let fundsValue = 0;
+        let cryptoValue = 0;
+        Object.keys(effectiveAssets).forEach(k => {
+          const v = parseFloat(effectiveAssets[k]) || 0;
+          realTotal += v;
+          const asset = assetsConfig.find(a => a.id === k);
+          const isCrypto = asset ? assetPillar(asset) === 'crypto' : (k === 'crypto');
+          if (isCrypto) cryptoValue += v;
+          else fundsValue += v;
+        });
+
+        lastFundsValue = fundsValue;
+        lastCryptoValue = cryptoValue;
+
+        const msciNav = (parseFloat(r.msciNav) > 0) ? parseFloat(r.msciNav) : lastMsciNav;
+        const sp500Nav = (parseFloat(r.sp500Nav) > 0) ? parseFloat(r.sp500Nav) : lastSp500Nav;
+        if (msciNav > 0) lastMsciNav = msciNav;
+        if (sp500Nav > 0) lastSp500Nav = sp500Nav;
 
         const gainReal = realTotal - cumulativeInvested;
         const returnRealPct = cumulativeInvested > 0 ? (gainReal / cumulativeInvested) * 100 : 0;
-        
+
         // Acciones Logic
         const gainStock = sTotal - cumulativeInvestedStock;
         const returnStockPct = cumulativeInvestedStock > 0 ? (gainStock / cumulativeInvestedStock) * 100 : 0;
@@ -1850,26 +2372,26 @@
         const returnTotalWealthPct = totalWealthInvested > 0 ? (gainTotalWealth / totalWealthInvested) * 100 : 0;
 
 
-        // En el primer registro (día 1), partimos del valor real de la cartera 
+        // En el primer registro (día 1), partimos del valor real de la cartera
         // para que todos los puntos (SBS, MSCI, S&P500 y Targets) salgan del mismo valor exacto.
-        let amountToInvest = r.aport;
+        let amountToInvest = aportTotal;
         if (index === 0) {
           amountToInvest = realTotal;
         }
 
         // MSCI World theoretical simulation
-        if (r.msciNav > 0) {
-          msciShares += amountToInvest / r.msciNav;
+        if (msciNav > 0) {
+          msciShares += amountToInvest / msciNav;
         }
-        const msciVal = msciShares * r.msciNav;
+        const msciVal = msciShares * msciNav;
         const gainMsci = msciVal - cumulativeInvested;
         const returnMsciPct = cumulativeInvested > 0 ? (gainMsci / cumulativeInvested) * 100 : 0;
 
         // S&P 500 theoretical simulation
-        if (r.sp500Nav > 0) {
-          sp500Shares += amountToInvest / r.sp500Nav;
+        if (sp500Nav > 0) {
+          sp500Shares += amountToInvest / sp500Nav;
         }
-        const sp500Val = sp500Shares * r.sp500Nav;
+        const sp500Val = sp500Shares * sp500Nav;
         const gainSp500 = sp500Val - cumulativeInvested;
         const returnSp500Pct = cumulativeInvested > 0 ? (gainSp500 / cumulativeInvested) * 100 : 0;
 
@@ -1883,13 +2405,19 @@
           const diffTime = Math.max(0, currDate - prevDate);
           const diffDays = diffTime / (1000 * 60 * 60 * 24);
 
-          target5Val = target5Val * Math.pow(dailyFactor5, diffDays) + r.aport;
-          target9Val = target9Val * Math.pow(dailyFactor9, diffDays) + r.aport;
+          target5Val = target5Val * Math.pow(dailyFactor5, diffDays) + aportTotal;
+          target9Val = target9Val * Math.pow(dailyFactor9, diffDays) + aportTotal;
         }
 
         return {
           ...r,
+          aport: aportTotal,
+          flows,
+          assets: effectiveAssets,
+          cryptoValue,
+          fundsValue,
           cumulativeInvested,
+          cumulativeInvestedCrypto,
           realTotal,
           gainReal,
           returnRealPct,
@@ -1994,6 +2522,7 @@
       renderHistoryTable(processed);
       calculateRebalance();
       renderAnnualStats(processed);
+      renderRisk(processed);
     }
 
     // Render KPIs
@@ -2470,20 +2999,24 @@
       if (processed.length === 0) return;
       const last = processed[processed.length - 1];
       const tbody = document.getElementById('assetBreakdownBody');
+      if (!tbody) return;
       tbody.innerHTML = '';
+
+      const denom = last.totalWealth || last.realTotal || 0;
 
       assetsConfig.forEach((asset) => {
         const val = (last.assets && last.assets[asset.id]) ? parseFloat(last.assets[asset.id]) : 0;
-        const currentWeight = last.realTotal > 0 ? (val / last.realTotal) * 100 : 0;
-        const diff = currentWeight - asset.target;
+        const currentWeight = denom > 0 ? (val / denom) * 100 : 0;
+        const target = Number(asset.target) || 0;
+        const diff = currentWeight - target;
 
         const tr = document.createElement('tr');
         tr.innerHTML = `
           <td>
             <div class="text-bold">${asset.name}</div>
-            <div class="text-muted" style="font-size: 0.75rem;">ISIN/Ticker: ${asset.isin || '-'}</div>
+            <div class="text-muted" style="font-size: 0.75rem;">${PILLARS[assetPillar(asset)].name} &middot; ${asset.isin || '-'}</div>
           </td>
-          <td>${asset.target.toFixed(1)}%</td>
+          <td>${target.toFixed(1)}%</td>
           <td class="text-bold">${fmtEur(val)}</td>
           <td>
             ${currentWeight.toFixed(1)}%
@@ -2499,22 +3032,223 @@
         `;
         tbody.appendChild(tr);
       });
+
+      // Trading 212 es una cuenta, no un activo, pero pesa en el 100 %.
+      const stockVal = last.stockTotal || 0;
+      const stockTarget = Number(appSettings.stockTarget) || 0;
+      if (stockVal > 0 || stockTarget > 0) {
+        const weight = denom > 0 ? (stockVal / denom) * 100 : 0;
+        const diff = weight - stockTarget;
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td>
+            <div class="text-bold">Trading 212 (acciones)</div>
+            <div class="text-muted" style="font-size: 0.75rem;">Trading 212 &middot; cuenta</div>
+          </td>
+          <td>${stockTarget.toFixed(1)}%</td>
+          <td class="text-bold">${fmtEur(stockVal)}</td>
+          <td>
+            ${weight.toFixed(1)}%
+            <div class="progress-bar-bg">
+              <div class="progress-bar-fill" style="width: ${Math.min(weight, 100)}%;"></div>
+            </div>
+          </td>
+          <td>
+            <span class="badge ${Math.abs(diff) <= 2 ? 'badge-success' : (diff > 0 ? 'badge-neutral' : 'badge-danger')}">
+              ${diff >= 0 ? '+' : ''}${diff.toFixed(1)}%
+            </span>
+          </td>
+        `;
+        tbody.appendChild(tr);
+      }
     }
 
     // Render Assets Config Management Table
+    // ================= OBJETIVOS: auto-ajuste, candado y orden =================
+    function targetSlots() {
+      const slots = assetsConfig.map(a => ({
+        key: 'asset:' + a.id,
+        locked: !!a.locked,
+        get: () => Number(a.target) || 0,
+        set: (x) => { a.target = x; }
+      }));
+      slots.push({
+        key: 'stock',
+        locked: !!appSettings.stockLocked,
+        get: () => Number(appSettings.stockTarget) || 0,
+        set: (x) => { appSettings.stockTarget = x; }
+      });
+      return slots;
+    }
+
+    function clampTarget(value) {
+      const v = parseFloat(String(value).replace(',', '.'));
+      if (isNaN(v)) return null;
+      return Math.min(100, Math.max(0, v));
+    }
+
+    // Fija un porcentaje y reparte el resto entre los desbloqueados.
+    function applyTargets(changedKey, value) {
+      const slots = targetSlots();
+      const changed = slots.find(s => s.key === changedKey);
+      if (!changed) return;
+      changed.set(value);
+      if (!appSettings.autoTargets) return;
+
+      const free = slots.filter(s => !s.locked && s.key !== changedKey);
+      if (!free.length) return;
+
+      const fixedSum = slots.filter(s => s.locked && s.key !== changedKey).reduce((t, s) => t + s.get(), 0);
+      const remaining = Math.max(0, Math.round((100 - value - fixedSum) * 10) / 10);
+      const freeSum = free.reduce((t, s) => t + s.get(), 0);
+      free.forEach(s => {
+        const v = freeSum > 0 ? (s.get() / freeSum) * remaining : remaining / free.length;
+        s.set(Math.round(v * 10) / 10);
+      });
+      fixRounding(slots, free);
+    }
+
+    // Ajusta la fila mayor para que el total quede exacto.
+    function fixRounding(slots, free) {
+      if (!free.length) return;
+      const total = slots.reduce((t, s) => t + s.get(), 0);
+      const delta = Math.round((100 - total) * 10) / 10;
+      if (Math.abs(delta) < 0.05) return;
+      const biggest = free.reduce((a, b) => (b.get() >= a.get() ? b : a), free[0]);
+      biggest.set(Math.max(0, Math.round((biggest.get() + delta) * 10) / 10));
+    }
+
+    function persistTargets() {
+      saveData();
+      renderAssetsConfigTable();
+      renderAllocationTable(calculateProcessedData());
+      calculateRebalance();
+      renderRisk(calculateProcessedData());
+    }
+
+    function setTargetWeight(id, value) {
+      const v = clampTarget(value);
+      if (v === null) { renderAssetsConfigTable(); return; }
+      applyTargets('asset:' + id, v);
+      persistTargets();
+    }
+
+    function setStockTarget(value) {
+      const v = clampTarget(value);
+      if (v === null) { renderAssetsConfigTable(); return; }
+      applyTargets('stock', v);
+      persistTargets();
+    }
+
+    function toggleLock(id) {
+      const a = assetsConfig.find(x => x.id === id);
+      if (!a) return;
+      a.locked = !a.locked;
+      persistTargets();
+    }
+
+    function toggleStockLock() {
+      appSettings.stockLocked = !appSettings.stockLocked;
+      saveSettings();
+      renderAssetsConfigTable();
+    }
+
+    function toggleAutoTargets() {
+      appSettings.autoTargets = !appSettings.autoTargets;
+      saveSettings();
+      renderAssetsConfigTable();
+    }
+
+    function normalizeTargets() {
+      const slots = targetSlots();
+      const total = slots.reduce((t, s) => t + s.get(), 0);
+      const free = slots.filter(s => !s.locked);
+      if (!free.length) { renderAssetsConfigTable(); return; }
+      if (total <= 0) {
+        const each = Math.round((100 / free.length) * 10) / 10;
+        free.forEach(s => s.set(each));
+      } else {
+        const factor = 100 / total;
+        slots.forEach(s => { if (!s.locked) s.set(Math.round(s.get() * factor * 10) / 10); });
+      }
+      fixRounding(slots, free);
+      persistTargets();
+    }
+
+    function updateTargetSum() {
+      const total = totalTargetWeight();
+      const pill = document.getElementById('targetSumPill');
+      if (pill) {
+        pill.textContent = total.toFixed(1).replace('.', ',') + ' %';
+        pill.classList.toggle('bad', Math.abs(total - 100) > 0.05);
+      }
+      const cell = document.getElementById('totalTargetWeightCell');
+      if (cell) {
+        cell.innerText = total.toFixed(1) + '%';
+        cell.className = Math.abs(total - 100) < 0.1 ? 'text-success' : 'text-danger';
+      }
+    }
+
+    // ---- Arrastrar y soltar para reordenar ----
+    let dragAssetIdx = null;
+
+    function handleDragStart(e) {
+      dragAssetIdx = parseInt(this.getAttribute('data-idx'));
+      this.classList.add('dragging');
+      e.dataTransfer.effectAllowed = 'move';
+      try { e.dataTransfer.setData('text/plain', String(dragAssetIdx)); } catch (err) { }
+    }
+    function handleDragOver(e) {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+      this.classList.add('drag-over');
+    }
+    function handleDragLeave() { this.classList.remove('drag-over'); }
+    function handleDragEnd() {
+      document.querySelectorAll('.asset-row').forEach(r => r.classList.remove('dragging', 'drag-over'));
+      dragAssetIdx = null;
+    }
+    function handleDrop(e) {
+      e.stopPropagation();
+      e.preventDefault();
+      this.classList.remove('drag-over');
+      const to = parseInt(this.getAttribute('data-idx'));
+      if (dragAssetIdx === null || isNaN(to) || dragAssetIdx === to) return;
+      const moved = assetsConfig.splice(dragAssetIdx, 1)[0];
+      assetsConfig.splice(to, 0, moved);
+      assetsConfig.forEach((a, i) => { a.order = i; });
+      dragAssetIdx = null;
+      saveData();
+      renderAll();
+      renderAssetsConfigTable();
+    }
+
     function renderAssetsConfigTable() {
       const tbody = document.getElementById('assetsConfigBody');
+      if (!tbody) return;
       tbody.innerHTML = '';
-      let totalTarget = 0;
 
       assetsConfig.forEach((asset, idx) => {
-        totalTarget += asset.target || 0;
+        const target = Number(asset.target) || 0;
         const tr = document.createElement('tr');
+        tr.className = 'asset-row' + (asset.locked ? ' locked' : '');
+        tr.draggable = true;
+        tr.setAttribute('data-idx', idx);
         tr.innerHTML = `
+          <td><span class="drag-handle" title="Arrastra para ordenar"><i class="fa-solid fa-grip-vertical"></i></span></td>
           <td class="text-bold">${asset.name}</td>
+          <td><span class="pillar-tag">${PILLARS[assetPillar(asset)].name}</span></td>
           <td>${asset.isin || '-'}</td>
-          <td class="text-bold">${(asset.target || 0).toFixed(1)}%</td>
-          <td>
+          <td style="text-align: right;">
+            <input type="number" step="0.1" min="0" max="100" class="target-input" value="${target.toFixed(1)}"
+                   onmousedown="event.stopPropagation()" onchange="setTargetWeight('${asset.id}', this.value)">
+          </td>
+          <td style="text-align: center;">
+            <button class="lock-btn ${asset.locked ? 'on' : ''}" title="Fijar este porcentaje" onclick="toggleLock('${asset.id}')">
+              <i class="fa-solid ${asset.locked ? 'fa-lock' : 'fa-lock-open'}"></i>
+            </button>
+          </td>
+          <td style="white-space: nowrap;">
             <button class="btn btn-secondary" style="padding: 4px 8px; font-size: 0.8rem;" onclick="openEditAssetModal(${idx})">
               <i class="fa-solid fa-pen"></i>
             </button>
@@ -2523,11 +3257,38 @@
             </button>
           </td>
         `;
+        tr.addEventListener('dragstart', handleDragStart);
+        tr.addEventListener('dragover', handleDragOver);
+        tr.addEventListener('dragleave', handleDragLeave);
+        tr.addEventListener('drop', handleDrop);
+        tr.addEventListener('dragend', handleDragEnd);
         tbody.appendChild(tr);
       });
 
-      document.getElementById('totalTargetWeightCell').innerText = `${totalTarget.toFixed(1)}%`;
-      document.getElementById('totalTargetWeightCell').className = Math.abs(totalTarget - 100) < 0.1 ? 'text-success' : 'text-danger';
+      const stockTarget = Number(appSettings.stockTarget) || 0;
+      const trStock = document.createElement('tr');
+      trStock.className = 'asset-row' + (appSettings.stockLocked ? ' locked' : '');
+      trStock.innerHTML = `
+        <td><span class="drag-handle" style="opacity: .25;"><i class="fa-solid fa-lock"></i></span></td>
+        <td class="text-bold">Trading 212 (acciones)</td>
+        <td><span class="pillar-tag">Trading 212</span></td>
+        <td>Cuenta completa</td>
+        <td style="text-align: right;">
+          <input type="number" step="0.1" min="0" max="100" class="target-input" value="${stockTarget.toFixed(1)}"
+                 onmousedown="event.stopPropagation()" onchange="setStockTarget(this.value)">
+        </td>
+        <td style="text-align: center;">
+          <button class="lock-btn ${appSettings.stockLocked ? 'on' : ''}" title="Fijar este porcentaje" onclick="toggleStockLock()">
+            <i class="fa-solid ${appSettings.stockLocked ? 'fa-lock' : 'fa-lock-open'}"></i>
+          </button>
+        </td>
+        <td></td>
+      `;
+      tbody.appendChild(trStock);
+
+      updateTargetSum();
+      const chip = document.getElementById('autoTargetChip');
+      if (chip) chip.classList.toggle('active', !!appSettings.autoTargets);
     }
 
     // Render History Table
@@ -2569,40 +3330,45 @@
       if (processed.length === 0) return;
 
       const last = processed[processed.length - 1];
-      const nextAport = parseFloat(document.getElementById('nextAportInput').value) || 0;
-      const targetPortfolioTotal = last.realTotal + nextAport;
+      const input = document.getElementById('nextAportInput');
+      const nextAport = input ? (parseFloat(input.value) || 0) : 0;
+      const totalNow = last.totalWealth || 0;
+      const targetPortfolioTotal = totalNow + nextAport;
 
       const tbody = document.getElementById('rebalanceTableBody');
+      if (!tbody) return;
       tbody.innerHTML = '';
 
-      let rawDiffs = assetsConfig.map(asset => {
-        const currentVal = (last.assets && last.assets[asset.id]) ? parseFloat(last.assets[asset.id]) : 0;
-        const targetVal = targetPortfolioTotal * (asset.target / 100);
-        const needed = Math.max(0, targetVal - currentVal);
-        return { asset, currentVal, targetVal, needed };
+      const rows = assetsConfig.map(asset => ({
+        name: asset.name,
+        target: Number(asset.target) || 0,
+        currentVal: (last.assets && last.assets[asset.id]) ? parseFloat(last.assets[asset.id]) : 0
+      }));
+      rows.push({
+        name: 'Trading 212 (acciones)',
+        target: Number(appSettings.stockTarget) || 0,
+        currentVal: last.stockTotal || 0
       });
 
-      const totalNeeded = rawDiffs.reduce((sum, item) => sum + item.needed, 0);
+      const targetSum = rows.reduce((s, r) => s + r.target, 0) || 100;
+      rows.forEach(r => {
+        r.targetVal = targetPortfolioTotal * (r.target / targetSum);
+        r.needed = Math.max(0, r.targetVal - r.currentVal);
+      });
+      const totalNeeded = rows.reduce((s, r) => s + r.needed, 0);
 
-      rawDiffs.forEach(item => {
-        let buyAmount = 0;
-        if (totalNeeded > 0) {
-          buyAmount = (item.needed / totalNeeded) * nextAport;
-        } else {
-          buyAmount = nextAport * (item.asset.target / 100);
-        }
-
-        const newTotalVal = item.currentVal + buyAmount;
-        const newWeight = targetPortfolioTotal > 0 ? (newTotalVal / targetPortfolioTotal) * 100 : 0;
-        const currentWeight = last.realTotal > 0 ? (item.currentVal / last.realTotal) * 100 : 0;
+      rows.forEach(r => {
+        const buy = totalNeeded > 0 ? (r.needed / totalNeeded) * nextAport : nextAport * (r.target / targetSum);
+        const newWeight = targetPortfolioTotal > 0 ? ((r.currentVal + buy) / targetPortfolioTotal) * 100 : 0;
+        const currentWeight = totalNow > 0 ? (r.currentVal / totalNow) * 100 : 0;
 
         const tr = document.createElement('tr');
         tr.innerHTML = `
-          <td class="text-bold">${item.asset.name}</td>
-          <td>${item.asset.target.toFixed(1)}%</td>
-          <td>${fmtEur(item.currentVal)}</td>
+          <td class="text-bold">${r.name}</td>
+          <td>${r.target.toFixed(1)}%</td>
+          <td>${fmtEur(r.currentVal)}</td>
           <td>${currentWeight.toFixed(1)}%</td>
-          <td class="text-bold text-success">+${fmtEur(buyAmount)}</td>
+          <td class="text-bold text-success">+${fmtEur(buy)}</td>
           <td>${newWeight.toFixed(1)}%</td>
         `;
         tbody.appendChild(tr);
@@ -2610,6 +3376,92 @@
     }
 
     
+    let ddChart = null;
+
+    function renderRisk(processed) {
+      const head = document.getElementById('riskTableHead');
+      const body = document.getElementById('riskTableBody');
+      if (!head || !body) return;
+
+      const risk = computeRisk(processed);
+      head.innerHTML = '';
+      body.innerHTML = '';
+      if (!risk) return;
+
+      head.innerHTML = '<th>Métrica</th>' + risk.columns.map(c => `<th>${c.name}</th>`).join('');
+
+      const pct = (v, digits) => (v === null || v === undefined || isNaN(v))
+        ? '<span class="text-muted">—</span>'
+        : (v * 100).toFixed(digits === undefined ? 1 : digits).replace('.', ',') + '%';
+      const num = (v) => (v === null || v === undefined || isNaN(v))
+        ? '<span class="text-muted">—</span>'
+        : v.toFixed(2).replace('.', ',');
+
+      const rows = [
+        ['Retorno total (TWR)', c => pct(c.m.ret)],
+        ['Retorno anual (TWR)', c => pct(c.m.cagr)],
+        ['TIR de tu dinero', c => pct(c.m.tir)],
+        ['Volatilidad anual', c => pct(c.m.vol)],
+        ['Sharpe', c => num(c.m.sharpe)],
+        ['Máx. caída', c => pct(c.m.maxDD)],
+        ['Beta vs MSCI', c => num(c.beta)]
+      ];
+
+      rows.forEach(row => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `<td>${row[0]}</td>` + risk.columns.map(c => `<td>${row[1](c)}</td>`).join('');
+        body.appendChild(tr);
+      });
+
+      const canvas = document.getElementById('chartDrawdown');
+      if (!canvas) return;
+      if (ddChart) { ddChart.destroy(); ddChart = null; }
+      ddChart = new Chart(canvas, {
+        type: 'line',
+        data: {
+          labels: risk.labels.map(d => fmtDateDisplay(d)),
+          datasets: [
+            {
+              label: 'Tu cartera',
+              data: risk.drawdown.total,
+              borderColor: '#4f46e5',
+              backgroundColor: 'rgba(79, 70, 229, .10)',
+              fill: true, pointRadius: 0, borderWidth: 2, tension: .25
+            },
+            {
+              label: 'MSCI World',
+              data: risk.drawdown.msci,
+              borderColor: '#94a3b8',
+              borderDash: [5, 4], fill: false, pointRadius: 0, borderWidth: 1.5, tension: .25
+            },
+            {
+              label: 'S&P 500',
+              data: risk.drawdown.sp500,
+              borderColor: '#f59e0b',
+              borderDash: [2, 3], fill: false, pointRadius: 0, borderWidth: 1.5, tension: .25
+            }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          interaction: { mode: 'index', intersect: false },
+          plugins: {
+            legend: { position: 'bottom' },
+            tooltip: {
+              callbacks: {
+                label: (ctx) => `${ctx.dataset.label}: ${ctx.parsed.y.toFixed(1).replace('.', ',')}%`
+              }
+            }
+          },
+          scales: {
+            y: { ticks: { callback: v => v + '%' } },
+            x: { ticks: { maxTicksLimit: 8 } }
+          }
+        }
+      });
+    }
+
     function renderAnnualStats(processed) {
       const tbody = document.getElementById('annualStatsTableBody');
       if (!tbody) return;
@@ -2692,6 +3544,11 @@
 
       document.getElementById(tabId).classList.add('active');
       btn.classList.add('active');
+
+      // Los gráficos se crean en pestañas ocultas: al mostrarlas hay que redimensionar.
+      if (tabId === 'tab-risk' && ddChart) {
+        setTimeout(() => ddChart.resize(), 30);
+      }
     }
 
     // Modal Operations (Record Date)
@@ -2700,20 +3557,19 @@
       document.getElementById('modalTitle').innerText = "Añadir Registro (Cualquier Día)";
       document.getElementById('recordForm').reset();
       
-      renderDynamicAssetInputs({});
+      renderDynamicAssetInputs(lastKnownAssets());
 
       const todayStr = new Date().toISOString().slice(0, 10);
       document.getElementById('inputDate').value = todayStr;
-      document.getElementById('inputStockAport').value = "0";
-      document.getElementById('inputStockTotal').value = "0";
+      document.getElementById('inputAport').value = "";
+      document.getElementById('inputCryptoAport').value = "";
+      document.getElementById('inputStockAport').value = "";
+      document.getElementById('inputStockTotal').value = lastKnownValue('stockTotal');
 
-      if (records.length > 0) {
-        document.getElementById('inputMsciNav').value = records[records.length - 1].msciNav;
-        document.getElementById('inputSp500Nav').value = records[records.length - 1].sp500Nav || 16.42;
-      } else {
-        document.getElementById('inputSp500Nav').value = 16.42;
-      }
+      document.getElementById('inputMsciNav').value = lastKnownValue('msciNav');
+      document.getElementById('inputSp500Nav').value = lastKnownValue('sp500Nav');
 
+      setPillarChips({ myinvestor: true, t212: true, crypto: true });
       document.getElementById('modalForm').classList.add('active');
     }
 
@@ -2722,31 +3578,79 @@
       document.getElementById('editIndex').value = index;
       document.getElementById('modalTitle').innerText = `Editar Registro: ${fmtDateDisplay(r.date)}`;
       
+      const flows = recordFlows(r);
       document.getElementById('inputDate').value = r.date;
-      document.getElementById('inputAport').value = r.aport;
-      document.getElementById('inputMsciNav').value = r.msciNav;
-      document.getElementById('inputSp500Nav').value = r.sp500Nav || 16.42;
-      document.getElementById('inputStockAport').value = r.stockAport || 0;
-      document.getElementById('inputStockTotal').value = r.stockTotal || 0;
+      document.getElementById('inputAport').value = flows.funds || "";
+      document.getElementById('inputCryptoAport').value = flows.crypto || "";
+      document.getElementById('inputMsciNav').value = r.msciNav || "";
+      document.getElementById('inputSp500Nav').value = r.sp500Nav || "";
+      document.getElementById('inputStockAport').value = r.stockAport || "";
+      document.getElementById('inputStockTotal').value = (r.stockTotal === 0 || r.stockTotal) ? r.stockTotal : "";
 
       renderDynamicAssetInputs(r.assets || {});
+      setPillarChips({ myinvestor: true, t212: true, crypto: true });
 
       document.getElementById('modalForm').classList.add('active');
     }
 
+    // Ultimo valor conocido de cada activo y de cada campo simple.
+    function lastKnownAssets() {
+      const out = {};
+      records.forEach(r => {
+        if (r.assets && typeof r.assets === 'object') {
+          Object.keys(r.assets).forEach(k => {
+            const v = parseFloat(r.assets[k]);
+            if (!isNaN(v)) out[k] = v;
+          });
+        }
+      });
+      return out;
+    }
+
+    function lastKnownValue(key) {
+      for (let i = records.length - 1; i >= 0; i--) {
+        const v = parseFloat(records[i][key]);
+        if (!isNaN(v) && v !== 0) return v;
+      }
+      return '';
+    }
+
     function renderDynamicAssetInputs(assetValuesMap) {
-      const container = document.getElementById('dynamicAssetInputs');
-      container.innerHTML = '';
+      const container = document.getElementById('fundsInputs');
+      const cryptoContainer = document.getElementById('cryptoInputs');
+      if (container) container.innerHTML = '';
+      if (cryptoContainer) cryptoContainer.innerHTML = '';
 
       assetsConfig.forEach(asset => {
+        const isCrypto = assetPillar(asset) === 'crypto';
+        const target = isCrypto ? cryptoContainer : container;
+        if (!target) return;
         const val = assetValuesMap[asset.id] !== undefined ? assetValuesMap[asset.id] : '';
         const div = document.createElement('div');
         div.className = 'form-group';
         div.innerHTML = `
-          <label for="input_asset_${asset.id}">${asset.name} (${asset.target}%)</label>
-          <input type="number" step="0.01" id="input_asset_${asset.id}" class="form-control asset-val-input" data-asset-id="${asset.id}" value="${val}" placeholder="0.00" required>
+          <label for="input_asset_${asset.id}">${asset.name}</label>
+          <input type="number" step="0.01" id="input_asset_${asset.id}" class="form-control asset-val-input" data-asset-id="${asset.id}" value="${val}" placeholder="0.00">
         `;
-        container.appendChild(div);
+        target.appendChild(div);
+      });
+    }
+
+    function togglePillarBlock(pillar) {
+      const chip = document.querySelector(`.chip[data-pillar="${pillar}"]`);
+      const block = document.getElementById('block-' + pillar);
+      if (!chip || !block) return;
+      chip.classList.toggle('active');
+      block.classList.toggle('hidden', !chip.classList.contains('active'));
+    }
+
+    function setPillarChips(state) {
+      document.querySelectorAll('#pillarChips .chip').forEach(chip => {
+        const pillar = chip.getAttribute('data-pillar');
+        const on = state[pillar] !== false;
+        chip.classList.toggle('active', on);
+        const block = document.getElementById('block-' + pillar);
+        if (block) block.classList.toggle('hidden', !on);
       });
     }
 
@@ -2758,20 +3662,38 @@
       e.preventDefault();
       const editIndex = parseInt(document.getElementById('editIndex').value);
       
+      // Valor vacío = no se toca: se arrastra el último valor conocido.
       const assetInputs = document.querySelectorAll('.asset-val-input');
       const assetsMap = {};
       assetInputs.forEach(input => {
-        const id = input.getAttribute('data-asset-id');
-        assetsMap[id] = parseFloat(input.value) || 0;
+        const raw = (input.value || '').trim();
+        if (raw === '') return;
+        const v = parseFloat(raw);
+        if (!isNaN(v)) assetsMap[input.getAttribute('data-asset-id')] = v;
       });
 
+      const fundsAport = parseFloat(document.getElementById('inputAport').value) || 0;
+      const cryptoAport = parseFloat(document.getElementById('inputCryptoAport').value) || 0;
+      const stockAport = parseFloat(document.getElementById('inputStockAport').value) || 0;
+      const stockTotalRaw = (document.getElementById('inputStockTotal').value || '').trim();
+      const msciRaw = (document.getElementById('inputMsciNav').value || '').trim();
+      const spRaw = (document.getElementById('inputSp500Nav').value || '').trim();
+      const dateVal = document.getElementById('inputDate').value;
+
+      if (!dateVal) { alert('Falta la fecha del registro.'); return; }
+      if (!Object.keys(assetsMap).length && !fundsAport && !cryptoAport && !stockAport && stockTotalRaw === '') {
+        alert('No hay nada que guardar: rellena al menos un valor o una aportación.');
+        return;
+      }
+
       const newRecord = {
-        date: document.getElementById('inputDate').value,
-        aport: parseFloat(document.getElementById('inputAport').value) || 0,
-        msciNav: parseFloat(document.getElementById('inputMsciNav').value) || 0,
-        sp500Nav: parseFloat(document.getElementById('inputSp500Nav').value) || 16.42,
-        stockAport: parseFloat(document.getElementById('inputStockAport').value) || 0,
-        stockTotal: parseFloat(document.getElementById('inputStockTotal').value) || 0,
+        date: dateVal,
+        aport: fundsAport + cryptoAport,
+        flows: { myinvestor: fundsAport, crypto: cryptoAport, t212: stockAport },
+        msciNav: msciRaw === '' ? null : (parseFloat(msciRaw) || 0),
+        sp500Nav: spRaw === '' ? null : (parseFloat(spRaw) || 0),
+        stockAport: stockAport,
+        stockTotal: stockTotalRaw === '' ? null : (parseFloat(stockTotalRaw) || 0),
         assets: assetsMap
       };
 
@@ -2799,18 +3721,22 @@
     // Modal Operations (Asset Config)
     function openAddAssetModal() {
       document.getElementById('assetEditId').value = '';
-      document.getElementById('modalAssetTitle').innerText = 'Añadir Nuevo Fondo';
+      document.getElementById('modalAssetTitle').innerText = 'Añadir Nuevo Activo';
       document.getElementById('assetConfigForm').reset();
+      const pillarSel = document.getElementById('assetPillarInput');
+      if (pillarSel) pillarSel.value = 'myinvestor';
       document.getElementById('modalAsset').classList.add('active');
     }
 
     function openEditAssetModal(index) {
       const asset = assetsConfig[index];
       document.getElementById('assetEditId').value = asset.id;
-      document.getElementById('modalAssetTitle').innerText = `Editar Fondo: ${asset.name}`;
+      document.getElementById('modalAssetTitle').innerText = `Editar Activo: ${asset.name}`;
       document.getElementById('assetNameInput').value = asset.name;
       document.getElementById('assetIsinInput').value = asset.isin || '';
       document.getElementById('assetTargetInput').value = asset.target;
+      const pillarSel = document.getElementById('assetPillarInput');
+      if (pillarSel) pillarSel.value = assetPillar(asset);
       document.getElementById('modalAsset').classList.add('active');
     }
 
@@ -2824,6 +3750,8 @@
       const name = document.getElementById('assetNameInput').value;
       const isin = document.getElementById('assetIsinInput').value;
       const target = parseFloat(document.getElementById('assetTargetInput').value) || 0;
+      const pillarSel = document.getElementById('assetPillarInput');
+      const pillar = pillarSel ? (pillarSel.value || 'myinvestor') : 'myinvestor';
 
       if (editId) {
         const asset = assetsConfig.find(a => a.id === editId);
@@ -2831,23 +3759,28 @@
           asset.name = name;
           asset.isin = isin;
           asset.target = target;
+          asset.pillar = pillar;
         }
       } else {
         const newId = 'asset_' + Date.now();
-        assetsConfig.push({ id: newId, name, isin, target });
+        assetsConfig.push({ id: newId, name, isin, target, pillar, order: assetsConfig.length, locked: false });
       }
 
+      normalizeConfig();
       saveData();
       renderAll();
+      renderAssetsConfigTable();
       closeAssetModal();
     }
 
     function deleteAsset(index) {
       const asset = assetsConfig[index];
-      if (confirm(`¿Eliminar el fondo "${asset.name}" de la configuración?`)) {
+      if (confirm(`¿Eliminar "${asset.name}" de la configuración? Sus datos históricos se conservan.`)) {
         assetsConfig.splice(index, 1);
+        normalizeConfig();
         saveData();
         renderAll();
+        renderAssetsConfigTable();
       }
     }
 
@@ -2855,7 +3788,8 @@
     function exportJSON() {
       const backupData = {
         assetsConfig,
-        records
+        records,
+        settings: appSettings
       };
       const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(backupData, null, 2));
       const downloadAnchor = document.createElement('a');
@@ -2898,9 +3832,15 @@
           if (imported.assetsConfig && imported.records) {
             assetsConfig = imported.assetsConfig;
             records = imported.records;
+            if (imported.settings && typeof imported.settings === 'object') {
+              appSettings = Object.assign({}, appSettings, imported.settings);
+              localStorage.setItem('inversiones_settings_v1', JSON.stringify(appSettings));
+            }
           } else if (Array.isArray(imported)) {
             records = imported;
           }
+          loadSettings();
+          normalizeConfig();
           saveData();
           renderAll();
           alert("¡Copia de seguridad importada correctamente!");
