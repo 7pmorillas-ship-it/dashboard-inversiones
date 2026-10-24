@@ -825,6 +825,78 @@
       color: var(--text-muted);
       margin-top: 12px;
     }
+    .basis-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+      gap: 12px;
+      padding: 4px 20px 14px;
+    }
+    .basis-item {
+      background: #f8fafc;
+      border: 1px solid var(--border-color);
+      border-radius: 10px;
+      padding: 10px 12px;
+    }
+    .basis-item .k {
+      display: block;
+      font-size: 10.5px;
+      text-transform: uppercase;
+      letter-spacing: .06em;
+      color: var(--text-muted);
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+    .basis-item .v {
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--text-main);
+      font-variant-numeric: tabular-nums;
+    }
+    .basis-item .v small {
+      display: block;
+      font-size: 11px;
+      font-weight: 500;
+      color: var(--text-muted);
+      margin-top: 2px;
+    }
+    .risk-table tr.row-ref td {
+      background: #f8fafc;
+      font-weight: 700;
+      border-top: 2px solid var(--border-color);
+    }
+    .risk-table td.small {
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+    .delta-pos { color: #16a34a; font-weight: 700; }
+    .delta-neg { color: #dc2626; font-weight: 700; }
+    .delta-flat { color: var(--text-muted); }
+
+    /* ===== Pulido de tablas ===== */
+    table { font-variant-numeric: tabular-nums; }
+    thead th {
+      position: sticky;
+      top: 0;
+      z-index: 2;
+      background: var(--bg-card);
+    }
+    tbody tr { transition: background .12s; }
+    tbody tr:hover { background: #f1f5f9; }
+    tbody tr:nth-child(even) { background: rgba(15, 23, 42, .015); }
+    tbody tr:nth-child(even):hover { background: #f1f5f9; }
+    .empty-state {
+      text-align: center;
+      padding: 36px 16px;
+      color: var(--text-muted);
+      font-size: 13px;
+      line-height: 1.6;
+    }
+    .empty-state i {
+      display: block;
+      font-size: 22px;
+      margin-bottom: 10px;
+      opacity: .5;
+    }
   </style>
 </head>
 <body>
@@ -942,7 +1014,7 @@
       <!-- Alpha vs Benchmarks -->
       <div class="kpi-card" style="--card-accent: #10b981;">
         <div class="kpi-header">
-          <span class="kpi-title">Alpha vs Mercado</span>
+          <span class="kpi-title">Diferencia vs Mercado</span>
           <i class="fa-solid fa-trophy kpi-icon"></i>
         </div>
         <div class="kpi-value" id="kpiAlphaMsciVal">+0.00%</div>
@@ -1002,7 +1074,7 @@
           <div class="chart-header">
             <div class="chart-title">
               <h3>Evolución Patrimonial (€)</h3>
-              <p>Valor real de tu cartera vs MSCI World, S&P 500 y metas teóricas 5%/9%</p>
+              <p>Patrimonio total (MyInvestor + Trading 212) frente a los índices simulados con <em>todo</em> tu dinero</p>
             </div>
             <div style="display: flex; gap: 8px; align-items: center;">
               <button class="btn btn-secondary" onclick="resetChartZoom('cardPatrimony')" title="Restablecer Zoom"><i class="fa-solid fa-rotate-left"></i> Restablecer</button>
@@ -1019,7 +1091,7 @@
           <div class="chart-header">
             <div class="chart-title">
               <h3>Rentabilidad Acumulada (%)</h3>
-              <p>Comparativa porcentual directa side-by-side</p>
+              <p>Rentabilidad de cada cuenta y de los índices, sobre su propio dinero</p>
             </div>
             <div style="display: flex; gap: 8px; align-items: center;">
               <button class="btn btn-secondary" onclick="resetChartZoom('cardReturn')" title="Restablecer Zoom"><i class="fa-solid fa-rotate-left"></i> Restablecer</button>
@@ -1132,8 +1204,21 @@
       <div class="table-card" style="margin-bottom: 24px;">
         <div class="chart-header">
           <div class="chart-title">
+            <h3>Base de cálculo</h3>
+            <p>Todo sale de tus registros: ni un dato de fuera</p>
+          </div>
+        </div>
+        <div class="basis-grid" id="riskBasis"></div>
+        <p class="metric-note" style="margin: 0 20px 18px;">
+          Los benchmarks <strong>no se descargan de internet</strong>: se construyen comprando <em>tu mismo dinero</em>, en <em>las mismas fechas</em> y a los <em>precios de fondo que tú anotas</em> en cada registro.
+          Si un registro no lleva precio, se mantiene el del anterior y ambos se quedan planos esos días, así que la comparación siempre es justa.
+        </p>
+      </div>
+      <div class="table-card" style="margin-bottom: 24px;">
+        <div class="chart-header">
+          <div class="chart-title">
             <h3>Métricas de riesgo frente a benchmarks</h3>
-            <p>Calculadas con tus registros y el calendario real entre fechas</p>
+            <p>Mismos euros, mismas fechas: comparación como para como</p>
           </div>
         </div>
         <div class="table-wrapper">
@@ -1145,13 +1230,15 @@
           </table>
         </div>
         <p class="metric-note">
-          <strong>TWR</strong> retorno anual encadenado, sin el efecto de tus aportaciones.
+          <strong>TWR</strong> retorno encadenado, sin el efecto de tus aportaciones.
           <strong>TIR</strong> rentabilidad real de tu dinero, ponderando cuándo entró cada euro.
-          <strong>Volatilidad</strong> desviación anualizada de los retornos diarios.
+          <strong>Volatilidad</strong> desviación anualizada de los retornos entre registros.
           <strong>Sharpe</strong> retorno extra por unidad de riesgo (tasa libre de riesgo 2 %).
           <strong>Máx. caída</strong> el peor descenso desde un máximo.
           <strong>Beta</strong> sensibilidad frente al MSCI World (1 = se mueve igual).
-          Todo se calcula con valores arrastrados cuando un registro no actualiza un activo, y con <em>—</em> si aún no hay datos suficientes. El retorno anual y el Sharpe necesitan al menos 6 meses de histórico; el total y la TIR salen desde el primer día.
+          Las columnas <strong>MSCI World</strong> y <strong>S&amp;P 500</strong> simulan meter <em>todo</em> lo que has aportado (fondos, cripto y acciones) en ese índice, en tus fechas y a tus precios anotados: la fila <strong>Diferencia vs MSCI</strong> es lo que ganas o pierdes de verdad.
+          Con pocos registros la volatilidad y la beta son ruido: mira la fila <strong>Observaciones</strong> antes de fiarte.
+          Los flujos se imputan al cierre de cada periodo (aproximación estándar cuando solo tienes un valor por mes).
         </p>
       </div>
       <div class="table-card">
@@ -1255,8 +1342,8 @@
                 <th class="col-fondos">Rent. MyInvestor + Cripto</th>
                 <th class="col-acciones">Rent. Acciones T212</th>
                 <th class="col-total">Rent. Pat. Total</th>
-                <th class="col-msci">Rent. MSCI World</th>
-                <th class="col-sp500">Rent. S&P 500</th>
+                <th class="col-msci">Rent. MSCI World <span class="text-muted" style="font-weight:400;">(todo)</span></th>
+                <th class="col-sp500">Rent. S&amp;P 500 <span class="text-muted" style="font-weight:400;">(todo)</span></th>
               </tr>
             </thead>
             <tbody id="annualStatsTableBody">
@@ -1264,6 +1351,10 @@
             </tbody>
           </table>
         </div>
+        <p class="metric-note" style="margin: 0 20px 18px;">
+          "Rent. Pat. Total" y las dos columnas de índices comparan el mismo dinero: todo lo aportado (fondos, cripto y acciones) en el mismo año.
+          "Rent. MyInvestor + Cripto" y "Acciones T212" son la rentabilidad de cada cuenta por separado. Primer año sin histórico previo: se toma el valor de partida.
+        </p>
       </div>
     </div>
 
@@ -1298,6 +1389,10 @@
             </tbody>
           </table>
         </div>
+        <p class="metric-note" style="margin: 0 20px 18px;">
+          Esta tabla es el libro de MyInvestor: la cartera real y las simulaciones usan solo el dinero de fondos y cripto.
+          Para comparar <em>todo</em> tu patrimonio (incluidas las acciones) contra los índices, usa la pestaña <strong>Riesgo &amp; Comparativa</strong>.
+        </p>
       </div>
     </div>
 
@@ -1341,8 +1436,10 @@
         <h3><i class="fa-solid fa-globe"></i> 3. ¿Cómo funciona la comparativa contra MSCI World y S&P 500?</h3>
         <p>Para medir si tu diversificación añade valor real respecto a simplemente comprar un índice global o estadounidense, la app utiliza una **cartera simétrica virtual**:</p>
         <ul>
-          <li>Cada vez que realizas una aportación, esa cantidad exacta de euros simula comprar participaciones del **MSCI World** (al precio de tu Fondo iShares Dev World) y del **S&P 500** (al precio que introduces del S&P 500).</li>
-          <li>Así se compara la rentabilidad neta acumulada en igualdad de condiciones (*side-by-side*).</li>
+          <li>Cada vez que registras una aportación, ese dinero exacto simula comprar participaciones del **MSCI World** (al precio del iShares Dev World que anotas) y del **S&amp;P 500** (al precio que introduces).</li>
+          <li>Se usa <strong>todo</strong> el dinero aportado: fondos, cripto y acciones de Trading 212. Así ambas columnas comparan los mismos euros en las mismas fechas.</li>
+          <li><strong>Ningún dato viene de internet.</strong> Si un registro no lleva precio, se mantiene el anterior y las dos curvas se quedan planas: la comparación sigue siendo justa, pero no inventa movimientos que no has anotado.</li>
+          <li>En la pestaña <strong>Riesgo &amp; Comparativa</strong> tienes la base de cálculo (registros, fechas, precios usados) y la fila "Diferencia vs MSCI" en puntos porcentuales.</li>
         </ul>
       </div>
 
@@ -1626,6 +1723,14 @@
 
     // Formatters
     const fmtEur = (val) => new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR' }).format(val || 0);
+    // Versión compacta para ejes de gráficos: 12,4 k€
+    const fmtEurShort = (val) => {
+      const n = Number(val) || 0;
+      const abs = Math.abs(n);
+      if (abs >= 1000000) return (n / 1000000).toFixed(abs >= 10000000 ? 0 : 1).replace('.', ',') + ' M€';
+      if (abs >= 1000) return (n / 1000).toFixed(abs >= 10000 ? 0 : 1).replace('.', ',') + ' k€';
+      return Math.round(n) + ' €';
+    };
     const fmtPct = (val) => (val >= 0 ? '+' : '') + (val || 0).toFixed(2) + '%';
     const fmtDateDisplay = (dateStr) => {
       if (!dateStr) return '';
@@ -2250,15 +2355,15 @@
       const sFunds = pick(p => p.fundsValue, p => p.flows.funds);
       const sCrypto = pick(p => p.cryptoValue, p => p.flows.crypto);
       const sStock = pick(p => p.stockTotal, p => p.flows.t212);
-      const sMsci = pick(p => p.msciVal, p => p.aport);
-      const sSp = pick(p => p.sp500Val, p => p.aport);
+      const sMsci = pick(p => p.msciAllVal, p => (p.aport + p.flows.t212));
+      const sSp = pick(p => p.sp500AllVal, p => (p.aport + p.flows.t212));
 
       const mTotal = metricsFromSeries(sTotal, cashflowsFor(processed, p => p.flows.funds + p.flows.crypto + p.flows.t212, last.totalWealth, processed[0].totalWealth));
       const mFunds = metricsFromSeries(sFunds, cashflowsFor(processed, p => p.flows.funds, last.fundsValue, processed[0].fundsValue));
       const mCrypto = metricsFromSeries(sCrypto, cashflowsFor(processed, p => p.flows.crypto, last.cryptoValue, processed[0].cryptoValue));
       const mStock = metricsFromSeries(sStock, cashflowsFor(processed, p => p.flows.t212, last.stockTotal, processed[0].stockTotal));
-      const mMsci = metricsFromSeries(sMsci, cashflowsFor(processed, p => p.aport, last.msciVal, processed[0].msciVal));
-      const mSp = metricsFromSeries(sSp, cashflowsFor(processed, p => p.aport, last.sp500Val, processed[0].sp500Val));
+      const mMsci = metricsFromSeries(sMsci, cashflowsFor(processed, p => (p.aport + p.flows.t212), last.msciAllVal, processed[0].msciAllVal));
+      const mSp = metricsFromSeries(sSp, cashflowsFor(processed, p => (p.aport + p.flows.t212), last.sp500AllVal, processed[0].sp500AllVal));
 
       const drawdown = (serie) => {
         let peak = serie.length ? serie[0].value : 0;
@@ -2270,7 +2375,28 @@
 
       const beta = (serie) => betaOf(serie, sMsci);
 
+      // Base de cálculo: de dónde sale cada número.
+      const lastNav = (key) => {
+        for (let i = processed.length - 1; i >= 0; i--) {
+          const v = parseFloat(processed[i][key]);
+          if (!isNaN(v) && v > 0) return { value: v, date: processed[i].date };
+        }
+        return null;
+      };
+      const daysSpan = daysBetween(processed[0].date, last.date);
+      const basis = {
+        n: processed.length,
+        from: processed[0].date,
+        to: last.date,
+        days: Math.round(daysSpan),
+        avgDays: processed.length > 1 ? Math.round(daysSpan / (processed.length - 1)) : 0,
+        investedAll: last.cumulativeInvestedAll || 0,
+        msci: lastNav('msciNav'),
+        sp500: lastNav('sp500Nav')
+      };
+
       return {
+        basis: basis,
         labels: processed.map(p => p.date),
         columns: [
           { key: 'total', name: 'Tu cartera', m: mTotal, series: sTotal, beta: beta(sTotal) },
@@ -2294,6 +2420,8 @@
       let cumulativeInvestedCrypto = 0;
       let msciShares = 0;
       let sp500Shares = 0;
+      let msciAllShares = 0;
+      let sp500AllShares = 0;
       let target5Val = 0;
       let target9Val = 0;
 
@@ -2395,18 +2523,30 @@
         const gainSp500 = sp500Val - cumulativeInvested;
         const returnSp500Pct = cumulativeInvested > 0 ? (gainSp500 / cumulativeInvested) * 100 : 0;
 
-        // Exact Days Compounding for Targets
+        // ---- Benchmark sobre TODO el dinero (fondos + cripto + acciones) ----
+        // Es el único modo de comparar peras con peras contra el patrimonio total.
+        const cumulativeInvestedAll = cumulativeInvested + cumulativeInvestedStock;
+        let amountAll = aportTotal + sAport;
+        if (index === 0) amountAll = realTotal + sTotal;
+        if (msciNav > 0) msciAllShares += amountAll / msciNav;
+        if (sp500Nav > 0) sp500AllShares += amountAll / sp500Nav;
+        const msciAllVal = msciAllShares * msciNav;
+        const sp500AllVal = sp500AllShares * sp500Nav;
+        const returnMsciAllPct = cumulativeInvestedAll > 0 ? ((msciAllVal - cumulativeInvestedAll) / cumulativeInvestedAll) * 100 : 0;
+        const returnSp500AllPct = cumulativeInvestedAll > 0 ? ((sp500AllVal - cumulativeInvestedAll) / cumulativeInvestedAll) * 100 : 0;
+
+        // Exact Days Compounding for Targets (sobre todo el dinero aportado)
         if (index === 0) {
-          target5Val = realTotal;
-          target9Val = realTotal;
+          target5Val = amountAll;
+          target9Val = amountAll;
         } else {
           const prevDate = new Date(records[index - 1].date);
           const currDate = new Date(r.date);
           const diffTime = Math.max(0, currDate - prevDate);
           const diffDays = diffTime / (1000 * 60 * 60 * 24);
 
-          target5Val = target5Val * Math.pow(dailyFactor5, diffDays) + aportTotal;
-          target9Val = target9Val * Math.pow(dailyFactor9, diffDays) + aportTotal;
+          target5Val = target5Val * Math.pow(dailyFactor5, diffDays) + amountAll;
+          target9Val = target9Val * Math.pow(dailyFactor9, diffDays) + amountAll;
         }
 
         return {
@@ -2425,6 +2565,11 @@
           returnMsciPct,
           sp500Val,
           returnSp500Pct,
+          msciAllVal,
+          sp500AllVal,
+          returnMsciAllPct,
+          returnSp500AllPct,
+          cumulativeInvestedAll,
           target5Val,
           target9Val,
           stockTotal: sTotal,
@@ -2563,22 +2708,38 @@
       const elStockGain = document.getElementById('kpiStockGain');
       if (elStockGain) elStockGain.innerText = `${fmtEur(last.gainStock)} ganancia`;
 
-      // 4. Alpha vs Benchmarks
-      const alphaMsci = last.returnTotalWealthPct - last.returnMsciPct;
-      const alphaSp500 = last.returnTotalWealthPct - last.returnSp500Pct;
+      // 4. Diferencia vs benchmarks (TWR: misma vara de medir que la pestaña de riesgo)
+      const twrReturn = (valueOf, flowOf) => {
+        const pts = processed.map(p => ({ date: p.date, value: valueOf(p) || 0, flow: flowOf(p) || 0 }));
+        const s = buildTwrSeries(pts);
+        return s.length > 1 && s[0].value > 0 ? s[s.length - 1].value / s[0].value - 1 : null;
+      };
+      const twrMine = twrReturn(p => p.totalWealth, p => p.flows.funds + p.flows.crypto + p.flows.t212);
+      const twrMsci = twrReturn(p => p.msciAllVal, p => p.aport + p.flows.t212);
+      const twrSp500 = twrReturn(p => p.sp500AllVal, p => p.aport + p.flows.t212);
+
       const elAlphaVal = document.getElementById('kpiAlphaMsciVal');
-      if (elAlphaVal) {
-        elAlphaVal.innerText = `${alphaMsci >= 0 ? '+' : ''}${alphaMsci.toFixed(2)}%`;
-        elAlphaVal.className = `kpi-value ${alphaMsci >= 0 ? 'text-success' : 'text-danger'}`;
-      }
       const elAlphaBadge = document.getElementById('kpiAlphaBadge');
-      if (elAlphaBadge) {
-        elAlphaBadge.innerText = alphaMsci >= 0 ? '🏆 Batiendo MSCI' : 'vs MSCI World';
-        elAlphaBadge.className = `badge ${alphaMsci >= 0 ? 'badge-success' : 'badge-danger'}`;
-      }
       const elAlphaSp = document.getElementById('kpiAlphaSp500Val');
-      if (elAlphaSp) {
-        elAlphaSp.innerText = `vs S&P 500: ${alphaSp500 >= 0 ? '+' : ''}${alphaSp500.toFixed(2)}%`;
+
+      if (twrMine === null || twrMsci === null) {
+        if (elAlphaVal) { elAlphaVal.innerText = '—'; elAlphaVal.className = 'kpi-value text-muted'; }
+        if (elAlphaBadge) { elAlphaBadge.innerText = 'faltan registros'; elAlphaBadge.className = 'badge badge-neutral'; }
+        if (elAlphaSp) elAlphaSp.innerText = 'vs S&P 500: —';
+      } else {
+        const alphaMsci = (twrMine - twrMsci) * 100;
+        const alphaSp500 = (twrMine - (twrSp500 === null ? twrMine : twrSp500)) * 100;
+        if (elAlphaVal) {
+          elAlphaVal.innerText = `${alphaMsci >= 0 ? '+' : ''}${alphaMsci.toFixed(2).replace('.', ',')} pp`;
+          elAlphaVal.className = `kpi-value ${alphaMsci >= 0 ? 'text-success' : 'text-danger'}`;
+        }
+        if (elAlphaBadge) {
+          elAlphaBadge.innerText = alphaMsci >= 0 ? '🏆 Batiendo MSCI' : 'vs MSCI World';
+          elAlphaBadge.className = `badge ${alphaMsci >= 0 ? 'badge-success' : 'badge-danger'}`;
+        }
+        if (elAlphaSp) {
+          elAlphaSp.innerText = `vs S&P 500: ${alphaSp500 >= 0 ? '+' : ''}${alphaSp500.toFixed(2).replace('.', ',')} pp`;
+        }
       }
 
       // 5. Total Invested in Period
@@ -2593,12 +2754,12 @@
     function renderCharts(processed) {
       const labels = processed.map(p => fmtDateDisplay(p.date));
 
-      const dsCumulative = processed.map((p, i) => ({ x: i, y: p.cumulativeInvested }));
+      const dsCumulative = processed.map((p, i) => ({ x: i, y: p.cumulativeInvestedAll }));
       const dsReal = processed.map((p, i) => ({ x: i, y: p.realTotal }));
       const dsStock = processed.map((p, i) => ({ x: i, y: p.stockTotal }));
       const dsWealth = processed.map((p, i) => ({ x: i, y: p.totalWealth }));
-      const dsMsci = processed.map((p, i) => ({ x: i, y: p.msciVal }));
-      const dsSp500 = processed.map((p, i) => ({ x: i, y: p.sp500Val }));
+      const dsMsci = processed.map((p, i) => ({ x: i, y: p.msciAllVal }));
+      const dsSp500 = processed.map((p, i) => ({ x: i, y: p.sp500AllVal }));
       const dsTarget5 = processed.map((p, i) => ({ x: i, y: p.target5Val }));
       const dsTarget9 = processed.map((p, i) => ({ x: i, y: p.target9Val }));
 
@@ -2764,7 +2925,7 @@
               type: 'linear',
               beginAtZero: false,
               grace: '5%',
-              ticks: { color: '#64748b', callback: (v) => fmtEur(v) },
+              ticks: { color: '#64748b', callback: (v) => fmtEurShort(v), maxTicksLimit: 6 },
               grid: { color: '#e2e8f0' }
             }
           }
@@ -2775,8 +2936,8 @@
       const dsReturnReal = processed.map((p, i) => ({ x: i, y: p.returnRealPct }));
       const dsReturnStock = processed.map((p, i) => ({ x: i, y: p.returnStockPct }));
       const dsReturnWealth = processed.map((p, i) => ({ x: i, y: p.returnTotalWealthPct }));
-      const dsReturnMsci = processed.map((p, i) => ({ x: i, y: p.returnMsciPct }));
-      const dsReturnSp500 = processed.map((p, i) => ({ x: i, y: p.returnSp500Pct }));
+      const dsReturnMsci = processed.map((p, i) => ({ x: i, y: p.returnMsciAllPct }));
+      const dsReturnSp500 = processed.map((p, i) => ({ x: i, y: p.returnSp500AllPct }));
 
       const ctxReturn = document.getElementById('chartReturn').getContext('2d');
       if (chartReturnInstance) chartReturnInstance.destroy();
@@ -2996,10 +3157,14 @@
 
     // Render Allocation Table
     function renderAllocationTable(processed) {
-      if (processed.length === 0) return;
-      const last = processed[processed.length - 1];
       const tbody = document.getElementById('assetBreakdownBody');
       if (!tbody) return;
+      if (processed.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="5"><div class="empty-state"><i class="fa-solid fa-pie-chart"></i>' +
+          'Sin registros todavía.<br>Añade el primero con el botón de arriba.</div></td></tr>';
+        return;
+      }
+      const last = processed[processed.length - 1];
       tbody.innerHTML = '';
 
       const denom = last.totalWealth || last.realTotal || 0;
@@ -3295,6 +3460,11 @@
     function renderHistoryTable(processed) {
       const tbody = document.getElementById('historyTableBody');
       tbody.innerHTML = '';
+      if (processed.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="11"><div class="empty-state"><i class="fa-solid fa-clock-rotate-left"></i>' +
+          'Aquí aparecerá cada registro que guardes, del más reciente al más antiguo.</div></td></tr>';
+        return;
+      }
 
       processed.slice().reverse().forEach((r, revIdx) => {
         const realIdx = processed.length - 1 - revIdx;
@@ -3386,7 +3556,15 @@
       const risk = computeRisk(processed);
       head.innerHTML = '';
       body.innerHTML = '';
-      if (!risk) return;
+      if (!risk) {
+        head.innerHTML = '<th>Métrica</th>';
+        body.innerHTML = '<tr><td colspan="7"><div class="empty-state"><i class="fa-solid fa-chart-line"></i>' +
+          'Aún no hay registros suficientes.<br>Añade dos registros con fechas distintas y aquí aparecerá la comparativa real.</div></td></tr>';
+        const basisEmpty = document.getElementById('riskBasis');
+        if (basisEmpty) basisEmpty.innerHTML = '';
+        if (ddChart) { ddChart.destroy(); ddChart = null; }
+        return;
+      }
 
       head.innerHTML = '<th>Métrica</th>' + risk.columns.map(c => `<th>${c.name}</th>`).join('');
 
@@ -3396,6 +3574,29 @@
       const num = (v) => (v === null || v === undefined || isNaN(v))
         ? '<span class="text-muted">—</span>'
         : v.toFixed(2).replace('.', ',');
+
+      // Base de cálculo: de dónde sale cada número
+      const shortDate = (d) => {
+        const p = String(d || '').split('-');
+        return p.length === 3 ? `${p[2]}/${p[1]}/${p[0].slice(2)}` : (d || '—');
+      };
+      const basisEl = document.getElementById('riskBasis');
+      if (basisEl) {
+        const b = risk.basis;
+        const nav = (x) => x ? x.value.toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 4 }) + ' €' : '—';
+        const item = (label, value, sub) =>
+          `<div class="basis-item"><span class="k">${label}</span><span class="v">${value}${sub ? `<small>${sub}</small>` : ''}</span></div>`;
+        basisEl.innerHTML = [
+          item('Registros analizados', b.n, `${shortDate(b.from)} → ${shortDate(b.to)}`),
+          item('Cada cuánto registras', b.avgDays + ' días', `${b.days} días en total`),
+          item('Dinero aportado', fmtEur(b.investedAll), 'fondos + cripto + acciones'),
+          item('Precio MSCI World', nav(b.msci), b.msci ? 'en tu registro del ' + shortDate(b.msci.date) : 'sin precios anotados'),
+          item('Precio S&P 500', nav(b.sp500), b.sp500 ? 'en tu registro del ' + shortDate(b.sp500.date) : 'sin precios anotados')
+        ].join('');
+      }
+
+      const msciCol = risk.columns.find(c => c.key === 'msci');
+      const msciRet = msciCol ? msciCol.m.ret : null;
 
       const rows = [
         ['Retorno total (TWR)', c => pct(c.m.ret)],
@@ -3412,6 +3613,24 @@
         tr.innerHTML = `<td>${row[0]}</td>` + risk.columns.map(c => `<td>${row[1](c)}</td>`).join('');
         body.appendChild(tr);
       });
+
+      // Diferencia real frente al MSCI, en puntos porcentuales
+      const trDelta = document.createElement('tr');
+      trDelta.className = 'row-ref';
+      trDelta.innerHTML = '<td>Diferencia vs MSCI</td>' + risk.columns.map(c => {
+        if (c.key === 'msci') return '<td class="delta-flat">—</td>';
+        if (c.m.ret === null || msciRet === null) return '<td class="delta-flat">—</td>';
+        const d = (c.m.ret - msciRet) * 100;
+        const cls = Math.abs(d) < 0.05 ? 'delta-flat' : (d > 0 ? 'delta-pos' : 'delta-neg');
+        return `<td class="${cls}">${d >= 0 ? '+' : ''}${d.toFixed(1).replace('.', ',')} pp</td>`;
+      }).join('');
+      body.appendChild(trDelta);
+
+      // Cuántos puntos sostienen cada columna
+      const trN = document.createElement('tr');
+      trN.innerHTML = '<td class="small">Observaciones</td>' + risk.columns.map(c =>
+        `<td class="small">${c.series.length || 0}</td>`).join('');
+      body.appendChild(trN);
 
       const canvas = document.getElementById('chartDrawdown');
       if (!canvas) return;
@@ -3497,15 +3716,15 @@
         const startFondos = prevYearLastRecord ? prevYearLastRecord.realTotal : 0;
         const startStocks = prevYearLastRecord ? prevYearLastRecord.stockTotal : 0;
         const startTotalW = prevYearLastRecord ? prevYearLastRecord.totalWealth : 0;
-        const startMsci = prevYearLastRecord ? prevYearLastRecord.msciVal : 0;
-        const startSp500 = prevYearLastRecord ? prevYearLastRecord.sp500Val : 0;
+        const startMsci = prevYearLastRecord ? prevYearLastRecord.msciAllVal : 0;
+        const startSp500 = prevYearLastRecord ? prevYearLastRecord.sp500AllVal : 0;
 
         // End values
         const endFondos = lastRec.realTotal;
         const endStocks = lastRec.stockTotal;
         const endTotalW = lastRec.totalWealth;
-        const endMsci = lastRec.msciVal;
-        const endSp500 = lastRec.sp500Val;
+        const endMsci = lastRec.msciAllVal;
+        const endSp500 = lastRec.sp500AllVal;
 
         // Calculate simplified annual return: (End - Start - Aports) / (Start + Aports)
         // Note: This is an approximation (Modified Dietz without precise day weighting, but perfectly fine for yearly summary if aports are somewhat evenly distributed, or just a rough year-end metric).
@@ -3518,8 +3737,8 @@
         const retFondos = calcRet(endFondos, startFondos, aportFondosYear);
         const retStocks = calcRet(endStocks, startStocks, aportStocksYear);
         const retTotalW = calcRet(endTotalW, startTotalW, aportTotalYear);
-        const retMsci = calcRet(endMsci, startMsci, aportFondosYear); // MSCI is benchmarked against Fondos aport
-        const retSp500 = calcRet(endSp500, startSp500, aportFondosYear); // SP500 is benchmarked against Fondos aport
+        const retMsci = calcRet(endMsci, startMsci, aportTotalYear); // índice con TODO el dinero aportado
+        const retSp500 = calcRet(endSp500, startSp500, aportTotalYear);
 
         const tr = document.createElement('tr');
         tr.innerHTML = `
