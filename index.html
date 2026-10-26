@@ -743,6 +743,46 @@
     }
     .modal-section.hidden { display: none; }
 
+    /* ===== Aportación rápida y avisos del formulario ===== */
+    .quick-grid { display: grid; gap: 8px; padding-bottom: 10px; }
+    .quick-row {
+      display: grid;
+      grid-template-columns: 1fr 130px;
+      gap: 10px;
+      align-items: center;
+    }
+    .quick-row label { font-size: 13px; font-weight: 600; color: var(--text-main); }
+    .quick-row label small { display: block; font-weight: 500; font-size: 11px; color: var(--text-muted); }
+    .quick-row input { text-align: right; padding: 7px 10px; }
+    .quick-summary {
+      font-size: 13px;
+      padding: 10px 12px;
+      border-radius: 10px;
+      background: rgba(79, 70, 229, .07);
+      color: var(--text-main);
+    }
+    .quick-warn, .flow-check.warn {
+      margin-top: 6px;
+      color: #b45309;
+      font-weight: 600;
+    }
+    .flow-check {
+      font-size: 12px;
+      line-height: 1.5;
+      color: var(--text-muted);
+      padding: 8px 10px;
+      margin: -8px 0 12px;
+      border-radius: 8px;
+      background: var(--bg-card);
+      border: 1px dashed var(--border-color);
+    }
+    .flow-check.warn { background: rgba(245, 158, 11, .08); border-color: rgba(245, 158, 11, .5); }
+    .flow-check select, .flow-check button { font-size: 12px; margin-left: 4px; }
+    .flow-check .ok { color: #16a34a; font-weight: 600; }
+    @media (max-width: 520px) {
+      .quick-row { grid-template-columns: 1fr 100px; }
+    }
+
     /* ===== Gestión de objetivos ===== */
     .target-input {
       width: 74px;
@@ -914,8 +954,11 @@
         </div>
       </div>
       <div class="header-actions">
-        <button class="btn btn-primary" onclick="openAddModal()">
-          <i class="fa-solid fa-plus"></i> Añadir Registro
+        <button class="btn btn-primary" onclick="openQuickModal()" title="Meter dinero sin tener que anotar todos los saldos">
+          <i class="fa-solid fa-piggy-bank"></i> Aportación
+        </button>
+        <button class="btn btn-primary" onclick="openAddModal()" title="Anotar saldos (y aportaciones) de una fecha">
+          <i class="fa-solid fa-plus"></i> Registrar saldos
         </button>
         <button class="btn btn-cloud" id="toggleCloudBtn" onclick="toggleCloudSync()">
           <i class="fa-solid fa-cloud"></i> Nube: ACTIVA
@@ -1091,9 +1134,13 @@
           <div class="chart-header">
             <div class="chart-title">
               <h3>Rentabilidad Acumulada (%)</h3>
-              <p>Rentabilidad de cada cuenta y de los índices, sobre su propio dinero</p>
+              <p id="returnChartSubtitle">Rentabilidad de cada cuenta y de los índices</p>
             </div>
-            <div style="display: flex; gap: 8px; align-items: center;">
+            <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+              <div class="filter-pills" id="returnModeToggle" style="margin: 0;">
+                <button class="pill-btn" data-mode="twr" onclick="setReturnMode('twr')" title="Rentabilidad de la inversión, sin el efecto de cuándo aportas">TWR</button>
+                <button class="pill-btn" data-mode="simple" onclick="setReturnMode('simple')" title="Ganancia dividida entre el dinero aportado">Sobre lo aportado</button>
+              </div>
               <button class="btn btn-secondary" onclick="resetChartZoom('cardReturn')" title="Restablecer Zoom"><i class="fa-solid fa-rotate-left"></i> Restablecer</button>
               <button class="btn btn-secondary" onclick="toggleFullscreen('cardReturn')"><i class="fa-solid fa-expand"></i> Ampliar</button>
             </div>
@@ -1176,7 +1223,8 @@
             <label for="nextAportInput">Próxima Aportación (€)</label>
             <input type="number" id="nextAportInput" class="form-control" value="300" step="10" oninput="calculateRebalance()">
           </div>
-          <button class="btn btn-primary" onclick="calculateRebalance()"><i class="fa-solid fa-rotate"></i> Recalcular</button>
+          <button class="btn btn-secondary" onclick="calculateRebalance()"><i class="fa-solid fa-rotate"></i> Recalcular</button>
+          <button class="btn btn-primary" onclick="registerRebalanceAport()" title="Abre la aportación con este reparto ya puesto"><i class="fa-solid fa-check"></i> Registrar esta aportación</button>
         </div>
 
         <div class="table-wrapper">
@@ -1232,7 +1280,7 @@
         <p class="metric-note">
           <strong>TWR</strong> retorno encadenado, sin el efecto de tus aportaciones.
           <strong>TIR</strong> rentabilidad real de tu dinero, ponderando cuándo entró cada euro.
-          <strong>Volatilidad</strong> desviación anualizada de los retornos entre registros.
+          <strong>Volatilidad</strong> desviación anualizada de los retornos entre registros, escalada por los días reales de cada intervalo (los registros que solo son una aportación no cuentan).
           <strong>Sharpe</strong> retorno extra por unidad de riesgo (tasa libre de riesgo 2 %).
           <strong>Máx. caída</strong> el peor descenso desde un máximo.
           <strong>Beta</strong> sensibilidad frente al MSCI World (1 = se mueve igual).
@@ -1317,6 +1365,9 @@
         <!-- Toggle Columns Toolbar -->
         <div style="display: flex; gap: 15px; margin-bottom: 15px; padding: 10px; background: #f8fafc; border-radius: 8px; border: 1px solid var(--border-color); font-size: 0.9rem; flex-wrap: wrap;">
           <label style="display: flex; align-items: center; gap: 5px; cursor: pointer;">
+            <input type="checkbox" checked onchange="toggleTableCol('col-gain', this.checked)"> Ganancia (€)
+          </label>
+          <label style="display: flex; align-items: center; gap: 5px; cursor: pointer;">
             <input type="checkbox" checked onchange="toggleTableCol('col-fondos', this.checked)"> MyInvestor + Cripto
           </label>
           <label style="display: flex; align-items: center; gap: 5px; cursor: pointer;">
@@ -1331,6 +1382,9 @@
           <label style="display: flex; align-items: center; gap: 5px; cursor: pointer;">
             <input type="checkbox" checked onchange="toggleTableCol('col-sp500', this.checked)"> S&P 500
           </label>
+          <label style="display: flex; align-items: center; gap: 5px; cursor: pointer;">
+            <input type="checkbox" checked onchange="toggleTableCol('col-diff', this.checked)"> Dif. vs MSCI
+          </label>
         </div>
 
         <div class="table-wrapper">
@@ -1339,11 +1393,13 @@
               <tr>
                 <th>Año</th>
                 <th>Aportado en Año</th>
+                <th class="col-gain">Ganancia del año</th>
                 <th class="col-fondos">Rent. MyInvestor + Cripto</th>
                 <th class="col-acciones">Rent. Acciones T212</th>
                 <th class="col-total">Rent. Pat. Total</th>
                 <th class="col-msci">Rent. MSCI World <span class="text-muted" style="font-weight:400;">(todo)</span></th>
                 <th class="col-sp500">Rent. S&amp;P 500 <span class="text-muted" style="font-weight:400;">(todo)</span></th>
+                <th class="col-diff">Dif. vs MSCI</th>
               </tr>
             </thead>
             <tbody id="annualStatsTableBody">
@@ -1352,8 +1408,9 @@
           </table>
         </div>
         <p class="metric-note" style="margin: 0 20px 18px;">
-          "Rent. Pat. Total" y las dos columnas de índices comparan el mismo dinero: todo lo aportado (fondos, cripto y acciones) en el mismo año.
-          "Rent. MyInvestor + Cripto" y "Acciones T212" son la rentabilidad de cada cuenta por separado. Primer año sin histórico previo: se toma el valor de partida.
+          Rentabilidades en <strong>TWR</strong>: cada año se mide desde el último registro del año anterior y las aportaciones no cuentan como ganancia (igual que en la pestaña de Riesgo).
+          "Rent. Pat. Total" y las dos columnas de índices usan el mismo dinero (fondos, cripto y acciones) en las mismas fechas; "Dif. vs MSCI" es la resta en puntos.
+          "Ganancia del año" son euros: lo que ha crecido el patrimonio menos lo que has aportado. El primer año y el año en curso son parciales (se indica el tramo).
         </p>
       </div>
     </div>
@@ -1417,12 +1474,25 @@
       </div>
 
       <div class="guide-card">
+        <h3><i class="fa-solid fa-piggy-bank"></i> 2a. Aportaciones (del mes o extra)</h3>
+        <p>El botón <strong>Aportación</strong> sirve para meter dinero sin tener que mirar todos los saldos:</p>
+        <ul>
+          <li>Pon el total y pulsa <strong>Repartir</strong>: lo distribuye según tus objetivos, priorizando lo que está más por debajo. O escribe tú cuánto va a cada fondo.</li>
+          <li>Cada euro se <strong>suma al último saldo</strong> del fondo al que va. El día que registres saldos reales, mandan esos.</li>
+          <li>Desde la <strong>Calculadora Rebalanceo</strong>, "Registrar esta aportación" abre esta misma ventana con el reparto ya puesto.</li>
+          <li>Si en "Registrar saldos" pones una aportación pero no cambias los saldos, la app te avisa y te deja sumarla a un fondo. Si no haces nada, se suma sola al guardar: ya no aparece como una pérdida falsa.</li>
+          <li>Los precios de los índices son opcionales: si los dejas vacíos, se estiman por fecha entre tu registro anterior y el siguiente, para que el índice no "compre" a un precio viejo.</li>
+        </ul>
+      </div>
+
+      <div class="guide-card">
         <h3><i class="fa-solid fa-layer-group"></i> 2b. Registrar solo una cuenta (MyInvestor, Trading 212 o Cripto)</h3>
         <p>No hace falta rellenar todo cada vez. En el formulario de registro:</p>
         <ul>
           <li>Los chips de arriba ocultan la cuenta que hoy no toques, para no perderte entre campos.</li>
           <li>Los valores vienen <strong>precargados con el último dato conocido</strong>. Si dejas un campo como está, se guarda igual.</li>
           <li>Si prefieres no repetirlo, bórralo: un campo vacío se rellena solo con el último valor del activo. Así puedes meter solo la cripto o solo las acciones.</li>
+          <li>Debajo de cada cuenta ves el saldo anterior, el nuevo, la aportación y lo que queda, que es lo que ha hecho el mercado. Si sale una variación enorme, revisa los números antes de guardar.</li>
           <li>La aportación va separada por cuenta (fondos, acciones y cripto), para que la pestaña de riesgo calcule bien la rentabilidad de cada una.</li>
         </ul>
       </div>
@@ -1457,7 +1527,7 @@
         <h3 id="modalTitle">Añadir Registro (Cualquier Día)</h3>
         <button class="close-btn" onclick="closeModal()">&times;</button>
       </div>
-      <form id="recordForm" onsubmit="saveRecord(event)">
+      <form id="recordForm" onsubmit="saveRecord(event)" oninput="updateRecordChecks()">
         <div class="modal-body">
           <input type="hidden" id="editIndex" value="-1">
 
@@ -1468,12 +1538,14 @@
             <span class="chip active" data-pillar="crypto" onclick="togglePillarBlock('crypto')"><span class="chip-dot"></span> Cripto</span>
           </div>
           <p class="metric-note" style="margin: 0 0 14px;">
-            Oculta con los chips la cuenta que hoy no toques. Lo que no cambies sigue contando: los valores se precargan con el último registro.
+            Oculta con los chips la cuenta que hoy no toques: no se guarda nada de ella y sigue contando con su último saldo.
+            Los saldos vienen con el último dato; debajo de cada cuenta ves cuánto ha cambiado y qué parte es mercado.
+            Para meter dinero sin mirar saldos, usa mejor el botón <strong>Aportación</strong>.
           </p>
 
           <div class="form-group" style="margin-bottom: 14px;">
             <label for="inputDate">Fecha Exacta</label>
-            <input type="date" id="inputDate" class="form-control" required>
+            <input type="date" id="inputDate" class="form-control" required onchange="updateRecordChecks()">
           </div>
 
           <div class="modal-section" id="block-myinvestor">
@@ -1501,6 +1573,7 @@
             <div class="form-grid" id="fundsInputs">
               <!-- Generado dinámicamente -->
             </div>
+            <div class="flow-check" id="check-myinvestor"></div>
           </div>
 
           <!-- Section 1.5: Cartera de Acciones -->
@@ -1516,6 +1589,7 @@
               <input type="number" step="0.01" id="inputStockTotal" class="form-control" placeholder="Ej: 1250.00">
             </div>
             </div>
+            <div class="flow-check" id="check-t212"></div>
           </div>
 
           <!-- Cripto -->
@@ -1530,12 +1604,82 @@
             <div class="form-grid" id="cryptoInputs">
               <!-- Generado dinámicamente -->
             </div>
+            <div class="flow-check" id="check-crypto"></div>
           </div>
         </div>
 
         <div class="modal-footer">
           <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancelar</button>
           <button type="submit" class="btn btn-primary"><i class="fa-solid fa-save"></i> Guardar Registro</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal: Aportación rápida -->
+  <div class="modal-overlay" id="modalQuick">
+    <div class="modal-card" style="max-width: 640px;">
+      <div class="modal-header">
+        <h3>Aportación</h3>
+        <button class="close-btn" onclick="closeQuickModal()">&times;</button>
+      </div>
+      <form id="quickForm" onsubmit="saveQuickAport(event)">
+        <div class="modal-body">
+          <p class="metric-note" style="margin: 0 0 14px;">
+            Para la aportación del mes o una extra, sin mirar saldos: lo que pongas en cada fondo se <strong>suma a su último saldo</strong>.
+            Cuando vuelvas a registrar saldos reales, mandan esos. Para retirar dinero, pon el importe en negativo.
+          </p>
+          <div class="form-grid" style="margin-bottom: 14px;">
+            <div class="form-group">
+              <label for="quickDate">Fecha</label>
+              <input type="date" id="quickDate" class="form-control" required onchange="renderQuickRows(quickAmounts()); updateQuickSummary()">
+            </div>
+            <div class="form-group">
+              <label for="quickTotal">Importe total (€)</label>
+              <div style="display: flex; gap: 8px;">
+                <input type="text" inputmode="decimal" id="quickTotal" class="form-control" placeholder="Ej: 300" style="flex: 1; min-width: 0;" oninput="updateQuickSummary()">
+                <button type="button" class="btn btn-secondary" onclick="quickDistribute()" title="Reparte el total según tus objetivos, priorizando lo que está más por debajo">
+                  <i class="fa-solid fa-wand-magic-sparkles"></i> Repartir
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div class="modal-section">
+            <div class="modal-section-title">MyInvestor · Fondos</div>
+            <div id="quickFunds" class="quick-grid"></div>
+          </div>
+          <div class="modal-section" id="quickCryptoBlock">
+            <div class="modal-section-title">Cripto</div>
+            <div id="quickCrypto" class="quick-grid"></div>
+          </div>
+          <div class="modal-section">
+            <div class="modal-section-title">Trading 212</div>
+            <div id="quickStock" class="quick-grid"></div>
+          </div>
+          <details class="modal-section" style="padding-bottom: 12px;">
+            <summary class="modal-section-title" style="cursor: pointer; margin: 0;">Precios de los índices (opcional)</summary>
+            <div class="form-grid" style="margin: 10px 0 0;">
+              <div class="form-group">
+                <label for="quickMsciNav">Precio iShares Dev World
+                  <a href="https://www.finect.com/fondos-inversion/IE000ZYRH0Q7" target="_blank" title="Mirar en Finect" style="color: var(--primary); text-decoration: none; margin-left: 4px;"><i class="fa-solid fa-arrow-up-right-from-square"></i></a>
+                </label>
+                <input type="text" inputmode="decimal" id="quickMsciNav" class="form-control">
+              </div>
+              <div class="form-group">
+                <label for="quickSp500Nav">Fidelity S&amp;P 500
+                  <a href="https://www.finect.com/fondos-inversion/IE00BYX5MX67" target="_blank" title="Mirar en Finect" style="color: var(--primary); text-decoration: none; margin-left: 4px;"><i class="fa-solid fa-arrow-up-right-from-square"></i></a>
+                </label>
+                <input type="text" inputmode="decimal" id="quickSp500Nav" class="form-control">
+              </div>
+            </div>
+            <p class="metric-note" style="margin: 8px 0 0;">Si los dejas vacíos, el índice "compra" al precio estimado por fecha entre tus registros anterior y siguiente.</p>
+          </details>
+          <div class="quick-summary" id="quickSummary"></div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" onclick="closeQuickModal()">Cancelar</button>
+          <button type="submit" class="btn btn-primary"><i class="fa-solid fa-save"></i> Guardar aportación</button>
         </div>
       </form>
     </div>
@@ -1784,7 +1928,7 @@
 
     function applyCloudPayload(payload) {
       if (!payload) return;
-      if (payload.records && Array.isArray(payload.records)) records = payload.records;
+      if (payload.records && Array.isArray(payload.records)) { records = payload.records; sortRecords(); }
       if (payload.assetsConfig && Array.isArray(payload.assetsConfig)) assetsConfig = payload.assetsConfig;
       if (payload.settings && typeof payload.settings === 'object') {
         appSettings = Object.assign({}, appSettings, payload.settings);
@@ -1965,6 +2109,7 @@
       } else {
         records = JSON.parse(JSON.stringify(DEFAULT_RECORDS));
       }
+      sortRecords();
 
       updateCloudBadgeStatus();
     }
@@ -2275,30 +2420,46 @@
       return cfs;
     }
 
-    function metricsFromSeries(serie, cashflows) {
+    // Volatilidad anualizada con registros a intervalos irregulares.
+    // Cada intervalo de d días aporta un retorno logarítmico cuya varianza crece
+    // con d (paseo aleatorio): var_diaria = Σ (r - μ·d)² / d / (n-1).
+    // (La versión anterior convertía cada retorno mensual a "diario" y luego
+    // escalaba con √365, lo que infravaloraba la volatilidad ~5 veces con
+    // registros mensuales e inflaba el Sharpe en la misma proporción.)
+    function annualVolatility(serie) {
+      const pts = [];
+      let sumR = 0, sumD = 0;
+      for (let i = 1; i < serie.length; i++) {
+        const d = daysBetween(serie[i - 1].date, serie[i].date);
+        const rr = serie[i].value / serie[i - 1].value;
+        if (d > 0 && rr > 0) {
+          const lr = Math.log(rr);
+          pts.push({ lr, d });
+          sumR += lr; sumD += d;
+        }
+      }
+      if (pts.length < 2 || sumD <= 0) return null;
+      const mu = sumR / sumD;
+      const varDaily = pts.reduce((s, p) => s + Math.pow(p.lr - mu * p.d, 2) / p.d, 0) / (pts.length - 1);
+      return Math.sqrt(varDaily * 365);
+    }
+
+    // `observed` = la serie sin los puntos que solo son una aportación sin saldos
+    // nuevos (ahí el valor es una estimación plana, no una medida del mercado).
+    function metricsFromSeries(serie, cashflows, observed) {
       const empty = { ret: null, cagr: null, vol: null, sharpe: null, maxDD: null, tir: null };
       if (!serie || serie.length < 2) return empty;
+      const obs = (observed && observed.length >= 2) ? observed : serie;
       const n = serie.length;
       const total = serie[n - 1].value / serie[0].value;
       const years = daysBetween(serie[0].date, serie[n - 1].date) / 365.25;
       const cagr = (years >= 0.5 && total > 0) ? Math.pow(total, 1 / years) - 1 : null;
 
-      const daily = [];
-      for (let i = 1; i < n; i++) {
-        const d = daysBetween(serie[i - 1].date, serie[i].date);
-        const rr = serie[i].value / serie[i - 1].value;
-        if (d > 0 && rr > 0) daily.push(Math.pow(rr, 1 / d) - 1);
-      }
-      let vol = null;
-      if (daily.length >= 2) {
-        const mean = daily.reduce((a, b) => a + b, 0) / daily.length;
-        const varc = daily.reduce((a, b) => a + (b - mean) * (b - mean), 0) / (daily.length - 1);
-        vol = Math.sqrt(varc) * Math.sqrt(365);
-      }
+      const vol = annualVolatility(obs);
       const sharpe = (cagr != null && vol > 0) ? (cagr - RISK_FREE_RATE) / vol : null;
 
-      let peak = serie[0].value, maxDD = 0;
-      serie.forEach(p => {
+      let peak = obs[0].value, maxDD = 0;
+      obs.forEach(p => {
         if (p.value > peak) peak = p.value;
         const dd = peak > 0 ? p.value / peak - 1 : 0;
         if (dd < maxDD) maxDD = dd;
@@ -2339,6 +2500,7 @@
     }
 
     // Construye todo lo que necesita la pestaña de riesgo.
+    // Todas las series van alineadas con `processed` (mismo índice = mismo registro).
     function computeRisk(processed) {
       if (!processed || processed.length === 0) return null;
       const pick = (valueOf, flowOf) => {
@@ -2350,20 +2512,33 @@
         return buildTwrSeries(pts);
       };
       const last = processed[processed.length - 1];
+      const flowAll = p => p.flows.funds + p.flows.crypto + p.flows.t212;
+      const flowBench = p => p.aport + p.flows.t212;
 
-      const sTotal = pick(p => p.totalWealth, p => (p.flows.funds + p.flows.crypto + p.flows.t212));
+      const sTotal = pick(p => p.totalWealth, flowAll);
+      const sReal = pick(p => p.realTotal, p => p.flows.funds + p.flows.crypto);
       const sFunds = pick(p => p.fundsValue, p => p.flows.funds);
       const sCrypto = pick(p => p.cryptoValue, p => p.flows.crypto);
       const sStock = pick(p => p.stockTotal, p => p.flows.t212);
-      const sMsci = pick(p => p.msciAllVal, p => (p.aport + p.flows.t212));
-      const sSp = pick(p => p.sp500AllVal, p => (p.aport + p.flows.t212));
+      const sMsci = pick(p => p.msciAllVal, flowBench);
+      const sSp = pick(p => p.sp500AllVal, flowBench);
 
-      const mTotal = metricsFromSeries(sTotal, cashflowsFor(processed, p => p.flows.funds + p.flows.crypto + p.flows.t212, last.totalWealth, processed[0].totalWealth));
-      const mFunds = metricsFromSeries(sFunds, cashflowsFor(processed, p => p.flows.funds, last.fundsValue, processed[0].fundsValue));
-      const mCrypto = metricsFromSeries(sCrypto, cashflowsFor(processed, p => p.flows.crypto, last.cryptoValue, processed[0].cryptoValue));
-      const mStock = metricsFromSeries(sStock, cashflowsFor(processed, p => p.flows.t212, last.stockTotal, processed[0].stockTotal));
-      const mMsci = metricsFromSeries(sMsci, cashflowsFor(processed, p => (p.aport + p.flows.t212), last.msciAllVal, processed[0].msciAllVal));
-      const mSp = metricsFromSeries(sSp, cashflowsFor(processed, p => (p.aport + p.flows.t212), last.sp500AllVal, processed[0].sp500AllVal));
+      // Puntos medidos de verdad (no aportaciones sueltas con saldo estimado).
+      // Se usa la misma máscara en todas las columnas: comparación como para como.
+      const mask = processed.map((p, i) => i === 0 || !p.estimatedBalances);
+      const observed = (serie) => serie.filter((_, i) => mask[i]);
+
+      const metrics = (serie, flowOf, valueOf) => metricsFromSeries(
+        serie,
+        cashflowsFor(processed, flowOf, valueOf(last), valueOf(processed[0])),
+        observed(serie)
+      );
+      const mTotal = metrics(sTotal, flowAll, p => p.totalWealth);
+      const mFunds = metrics(sFunds, p => p.flows.funds, p => p.fundsValue);
+      const mCrypto = metrics(sCrypto, p => p.flows.crypto, p => p.cryptoValue);
+      const mStock = metrics(sStock, p => p.flows.t212, p => p.stockTotal);
+      const mMsci = metrics(sMsci, flowBench, p => p.msciAllVal);
+      const mSp = metrics(sSp, flowBench, p => p.sp500AllVal);
 
       const drawdown = (serie) => {
         let peak = serie.length ? serie[0].value : 0;
@@ -2373,7 +2548,8 @@
         });
       };
 
-      const beta = (serie) => betaOf(serie, sMsci);
+      const msciObs = observed(sMsci);
+      const beta = (serie) => serie.length ? betaOf(observed(serie), msciObs) : null;
 
       // Base de cálculo: de dónde sale cada número.
       const lastNav = (key) => {
@@ -2384,12 +2560,16 @@
         return null;
       };
       const daysSpan = daysBetween(processed[0].date, last.date);
+      const nObserved = mask.filter(Boolean).length;
       const basis = {
         n: processed.length,
+        nObserved: nObserved,
+        nAutoFlow: processed.filter(p => p.estimatedBalances).length,
+        nNavEstimated: processed.filter(p => p.navEstimated).length,
         from: processed[0].date,
         to: last.date,
         days: Math.round(daysSpan),
-        avgDays: processed.length > 1 ? Math.round(daysSpan / (processed.length - 1)) : 0,
+        avgDays: nObserved > 1 ? Math.round(daysSpan / (nObserved - 1)) : 0,
         investedAll: last.cumulativeInvestedAll || 0,
         msci: lastNav('msciNav'),
         sp500: lastNav('sp500Nav')
@@ -2398,12 +2578,13 @@
       return {
         basis: basis,
         labels: processed.map(p => p.date),
+        series: { total: sTotal, real: sReal, funds: sFunds, crypto: sCrypto, t212: sStock, msci: sMsci, sp500: sSp },
         columns: [
           { key: 'total', name: 'Tu cartera', m: mTotal, series: sTotal, beta: beta(sTotal) },
           { key: 'funds', name: 'MyInvestor', m: mFunds, series: sFunds, beta: beta(sFunds) },
           { key: 'crypto', name: 'Cripto', m: mCrypto, series: sCrypto, beta: beta(sCrypto) },
           { key: 't212', name: 'Trading 212', m: mStock, series: sStock, beta: beta(sStock) },
-          { key: 'msci', name: 'MSCI World', m: mMsci, series: sMsci, beta: 1 },
+          { key: 'msci', name: 'MSCI World', m: mMsci, series: sMsci, beta: sMsci.length ? 1 : null },
           { key: 'sp500', name: 'S&P 500', m: mSp, series: sSp, beta: beta(sSp) }
         ],
         drawdown: {
@@ -2414,7 +2595,46 @@
       };
     }
 
+    // Precio de un benchmark en cada registro. Si un registro no lo lleva, se
+    // interpola por fecha entre el anterior y el siguiente conocidos (o se usa
+    // el más cercano en los extremos). Así una aportación extra a mitad de mes
+    // no "compra" el índice al precio viejo del registro anterior.
+    function navSeries(key) {
+      const n = records.length;
+      const raw = records.map(r => { const v = parseFloat(r[key]); return v > 0 ? v : null; });
+      const prevIdx = new Array(n), nextIdx = new Array(n);
+      let p = -1;
+      for (let i = 0; i < n; i++) { if (raw[i] !== null) p = i; prevIdx[i] = p; }
+      let q = -1;
+      for (let i = n - 1; i >= 0; i--) { if (raw[i] !== null) q = i; nextIdx[i] = q; }
+      return records.map((r, i) => {
+        if (raw[i] !== null) return { value: raw[i], estimated: false };
+        const a = prevIdx[i], b = nextIdx[i];
+        if (a >= 0 && b >= 0) {
+          const span = daysBetween(records[a].date, records[b].date);
+          const t = span > 0 ? daysBetween(records[a].date, r.date) / span : 0;
+          return { value: raw[a] + (raw[b] - raw[a]) * t, estimated: true };
+        }
+        if (a >= 0) return { value: raw[a], estimated: true };
+        if (b >= 0) return { value: raw[b], estimated: true };
+        return { value: 0, estimated: false };
+      });
+    }
+
+    function sortRecords() {
+      records.sort((a, b) => String(a.date).localeCompare(String(b.date)));
+    }
+
+    function keyPillar(k) {
+      const asset = assetsConfig.find(a => a.id === k);
+      return asset ? assetPillar(asset) : (k === 'crypto' ? 'crypto' : 'myinvestor');
+    }
+
     function calculateProcessedData() {
+      return filterProcessedByPeriod(calculateAllProcessed());
+    }
+
+    function calculateAllProcessed() {
       let cumulativeInvested = 0;
       let cumulativeInvestedStock = 0;
       let cumulativeInvestedCrypto = 0;
@@ -2436,8 +2656,10 @@
       let lastSp500Nav = 0;
       let lastFundsValue = 0;
       let lastCryptoValue = 0;
+      const msciNavs = navSeries('msciNav');
+      const sp500Navs = navSeries('sp500Nav');
 
-      const allProcessed = records.map((r, index) => {
+      return records.map((r, index) => {
         const flows = recordFlows(r);
         // Registros antiguos sin desglose: la aportación se reparte entre fondos
         // y cripto según el peso que tenían en el registro anterior.
@@ -2452,18 +2674,53 @@
         cumulativeInvestedCrypto += flows.crypto;
         const sAport = flows.t212;
         const hasStockTotal = (r.stockTotal !== undefined && r.stockTotal !== null && r.stockTotal !== '');
-        const sTotal = hasStockTotal ? (parseFloat(r.stockTotal) || 0) : lastStockTotal;
-        lastStockTotal = sTotal;
+        let sTotal = hasStockTotal ? (parseFloat(r.stockTotal) || 0) : lastStockTotal;
         cumulativeInvestedStock += sAport;
 
-        // Valores efectivos (arrastre)
+        // Valores efectivos (arrastre). `reported` = activos cuyo saldo cambia en este registro.
         const effectiveAssets = Object.assign({}, lastAssets);
+        const reported = {};
         if (r.assets && typeof r.assets === 'object') {
           Object.keys(r.assets).forEach(k => {
             const v = parseFloat(r.assets[k]);
-            if (!isNaN(v)) effectiveAssets[k] = v;
+            if (isNaN(v)) return;
+            const prev = parseFloat(lastAssets[k]);
+            if (isNaN(prev) || Math.abs(prev - v) > 0.004) reported[k] = true;
+            effectiveAssets[k] = v;
           });
         }
+
+        // Aportación sin saldos nuevos: si una cuenta recibe dinero pero ninguno de
+        // sus saldos cambia, el dinero no puede haberse evaporado. Se suma al último
+        // saldo conocido (proporcional a lo que ya había) para no fabricar una pérdida.
+        const autoFlow = { funds: false, crypto: false, t212: false };
+        if (index > 0) {
+          [['funds', 'myinvestor'], ['crypto', 'crypto']].forEach(([fk, pillar]) => {
+            const amount = flows[fk];
+            if (!(Math.abs(amount) > 0.004)) return;
+            const keys = Object.keys(effectiveAssets).filter(k => keyPillar(k) === pillar);
+            if (keys.some(k => reported[k])) return;
+            const base = keys.reduce((s, k) => s + Math.max(0, parseFloat(effectiveAssets[k]) || 0), 0);
+            if (base > 0) {
+              keys.forEach(k => {
+                const v = Math.max(0, parseFloat(effectiveAssets[k]) || 0);
+                effectiveAssets[k] = v + amount * (v / base);
+              });
+            } else {
+              const dest = assetsConfig.filter(a => assetPillar(a) === pillar)
+                .sort((x, y) => (Number(y.target) || 0) - (Number(x.target) || 0))[0];
+              if (!dest) return;
+              effectiveAssets[dest.id] = (parseFloat(effectiveAssets[dest.id]) || 0) + amount;
+            }
+            autoFlow[fk] = true;
+          });
+          const stockUnchanged = !hasStockTotal || Math.abs(sTotal - lastStockTotal) <= 0.004;
+          if (Math.abs(sAport) > 0.004 && stockUnchanged) {
+            sTotal = lastStockTotal + sAport;
+            autoFlow.t212 = true;
+          }
+        }
+        lastStockTotal = sTotal;
         lastAssets = Object.assign({}, effectiveAssets);
 
         let realTotal = 0;
@@ -2481,10 +2738,17 @@
         lastFundsValue = fundsValue;
         lastCryptoValue = cryptoValue;
 
-        const msciNav = (parseFloat(r.msciNav) > 0) ? parseFloat(r.msciNav) : lastMsciNav;
-        const sp500Nav = (parseFloat(r.sp500Nav) > 0) ? parseFloat(r.sp500Nav) : lastSp500Nav;
+        const msciNav = msciNavs[index].value || lastMsciNav;
+        const sp500Nav = sp500Navs[index].value || lastSp500Nav;
         if (msciNav > 0) lastMsciNav = msciNav;
         if (sp500Nav > 0) lastSp500Nav = sp500Nav;
+
+        // Primer registro sin aportación: lo que ya había es el capital de partida.
+        // Si no, "invertido" sería 0 y todo el saldo inicial contaría como ganancia.
+        if (index === 0) {
+          if (!(aportTotal > 0) && realTotal > 0) cumulativeInvested += realTotal;
+          if (!(sAport > 0) && sTotal > 0) cumulativeInvestedStock += sTotal;
+        }
 
         const gainReal = realTotal - cumulativeInvested;
         const returnRealPct = cumulativeInvested > 0 ? (gainReal / cumulativeInvested) * 100 : 0;
@@ -2551,6 +2815,15 @@
 
         return {
           ...r,
+          _idx: index,
+          autoFlow,
+          autoFlowAny: autoFlow.funds || autoFlow.crypto || autoFlow.t212,
+          // Saldos estimados (aportación sin saldos nuevos o hecha con "Aportación"):
+          // cuentan para el dinero, pero no como medida del mercado.
+          estimatedBalances: autoFlow.funds || autoFlow.crypto || autoFlow.t212 || r.kind === 'aport',
+          msciNavUsed: msciNav,
+          sp500NavUsed: sp500Nav,
+          navEstimated: msciNavs[index].estimated || sp500Navs[index].estimated,
           aport: aportTotal,
           flows,
           assets: effectiveAssets,
@@ -2583,8 +2856,6 @@
           returnTotalWealthPct
         };
       });
-
-      return filterProcessedByPeriod(allProcessed);
     }
 
     // Filter Logic by Time Period
@@ -2709,14 +2980,14 @@
       if (elStockGain) elStockGain.innerText = `${fmtEur(last.gainStock)} ganancia`;
 
       // 4. Diferencia vs benchmarks (TWR: misma vara de medir que la pestaña de riesgo)
-      const twrReturn = (valueOf, flowOf) => {
-        const pts = processed.map(p => ({ date: p.date, value: valueOf(p) || 0, flow: flowOf(p) || 0 }));
-        const s = buildTwrSeries(pts);
-        return s.length > 1 && s[0].value > 0 ? s[s.length - 1].value / s[0].value - 1 : null;
+      const risk = computeRisk(processed);
+      const colRet = (key) => {
+        const c = risk && risk.columns.find(x => x.key === key);
+        return c && c.series.length > 1 ? c.m.ret : null;
       };
-      const twrMine = twrReturn(p => p.totalWealth, p => p.flows.funds + p.flows.crypto + p.flows.t212);
-      const twrMsci = twrReturn(p => p.msciAllVal, p => p.aport + p.flows.t212);
-      const twrSp500 = twrReturn(p => p.sp500AllVal, p => p.aport + p.flows.t212);
+      const twrMine = colRet('total');
+      const twrMsci = colRet('msci');
+      const twrSp500 = colRet('sp500');
 
       const elAlphaVal = document.getElementById('kpiAlphaMsciVal');
       const elAlphaBadge = document.getElementById('kpiAlphaBadge');
@@ -2750,326 +3021,214 @@
       if (elMonthsCount) elMonthsCount.innerText = `${processed.length} registros en rango`;
     }
 
+    // ================= GRÁFICOS: utilidades comunes =================
+    const SERIES_COLORS = {
+      total: '#4f46e5', real: '#0284c7', t212: '#8b5cf6', invested: '#94a3b8',
+      msci: '#f59e0b', sp500: '#f43f5e', target5: '#10b981', target9: '#6366f1'
+    };
+
+    // Eje X temporal: la distancia entre puntos respeta los días reales, así un
+    // registro extra a mitad de mes no estira el gráfico como si fuera un mes entero.
+    const dateToX = (d) => Date.parse(String(d) + 'T00:00:00Z');
+    const xToDateLabel = (x) => {
+      const d = new Date(x);
+      if (isNaN(d)) return '';
+      const dd = String(d.getUTCDate()).padStart(2, '0');
+      const mm = String(d.getUTCMonth() + 1).padStart(2, '0');
+      return `${dd}/${mm}/${String(d.getUTCFullYear()).slice(2)}`;
+    };
+    function timeAxis(xs) {
+      const min = xs.length ? xs[0] : 0;
+      let max = xs.length ? xs[xs.length - 1] : 1;
+      if (max <= min) max = min + 86400000;
+      return {
+        type: 'linear', min, max,
+        ticks: { color: '#64748b', maxTicksLimit: 8, maxRotation: 0, callback: (v) => xToDateLabel(v) },
+        grid: { color: '#e2e8f0' }
+      };
+    }
+
+    // Series ocultas/visibles recordadas entre visitas (clic en la leyenda).
+    const CHART_VIS_KEY = 'inv_chart_visibility_v1';
+    function chartVisibility() {
+      try { return JSON.parse(localStorage.getItem(CHART_VIS_KEY) || '{}'); } catch (e) { return {}; }
+    }
+    function isSeriesHidden(chartKey, id, hiddenByDefault) {
+      const v = chartVisibility()[chartKey + ':' + id];
+      return typeof v === 'boolean' ? v : !!hiddenByDefault;
+    }
+    function legendWithMemory(chartKey) {
+      return {
+        position: 'bottom',
+        labels: { color: '#334155', font: { family: 'Outfit', weight: '600' }, usePointStyle: true, pointStyle: 'line', padding: 14 },
+        onClick: (e, item, legend) => {
+          const chart = legend.chart;
+          const ds = chart.data.datasets[item.datasetIndex];
+          const visible = chart.isDatasetVisible(item.datasetIndex);
+          chart.setDatasetVisibility(item.datasetIndex, !visible);
+          chart.update();
+          const vis = chartVisibility();
+          vis[chartKey + ':' + ds.id] = visible;
+          localStorage.setItem(CHART_VIS_KEY, JSON.stringify(vis));
+        }
+      };
+    }
+
+    function lineDataset(chartKey, id, label, data, color, opts) {
+      const o = opts || {};
+      return Object.assign({
+        id, label, data,
+        borderColor: color,
+        backgroundColor: color,
+        borderWidth: 2,
+        pointRadius: 0,
+        pointHoverRadius: 5,
+        fill: false,
+        tension: 0,
+        hidden: isSeriesHidden(chartKey, id, o.hiddenByDefault)
+      }, o.ds || {});
+    }
+
+    function tooltipAportFooter(processed) {
+      return (items) => {
+        if (!items || !items.length) return '';
+        const p = processed[items[0].dataIndex];
+        if (!p) return '';
+        const total = p.flows.funds + p.flows.crypto + p.flows.t212;
+        if (Math.abs(total) < 0.005) return '';
+        const parts = [];
+        if (p.flows.funds) parts.push('fondos ' + fmtEur(p.flows.funds));
+        if (p.flows.crypto) parts.push('cripto ' + fmtEur(p.flows.crypto));
+        if (p.flows.t212) parts.push('T212 ' + fmtEur(p.flows.t212));
+        const lines = ['Aportado aquí: ' + fmtEur(total) + (parts.length > 1 ? ' (' + parts.join(' · ') + ')' : '')];
+        if (p.estimatedBalances) lines.push('Sin saldos nuevos: sumado al último saldo');
+        return lines;
+      };
+    }
+
+    function baseLineOptions(chartKey, xs, processed, yTick, labelFmt) {
+      return {
+        responsive: true,
+        maintainAspectRatio: false,
+        animation: false,
+        transitions: { zoom: { animation: { duration: 0 } } },
+        interaction: { mode: 'index', intersect: false },
+        plugins: {
+          legend: legendWithMemory(chartKey),
+          tooltip: {
+            mode: 'index',
+            intersect: false,
+            itemSort: (a, b) => b.parsed.y - a.parsed.y,
+            callbacks: {
+              title: (items) => items.length ? fmtDateDisplay(processed[items[0].dataIndex].date) : '',
+              label: (ctx) => ctx.parsed.y === null ? null : `${ctx.dataset.label}: ${labelFmt(ctx.parsed.y)}`,
+              footer: tooltipAportFooter(processed)
+            }
+          },
+          zoom: {
+            pan: { enabled: true, mode: 'x', threshold: 5 },
+            zoom: { wheel: { enabled: true, speed: 0.08 }, pinch: { enabled: true }, mode: 'x' },
+            limits: { x: { min: 'original', max: 'original' } }
+          }
+        },
+        scales: {
+          x: timeAxis(xs),
+          y: {
+            type: 'linear',
+            beginAtZero: false,
+            grace: '5%',
+            ticks: { color: '#64748b', callback: yTick, maxTicksLimit: 7 },
+            grid: { color: '#e2e8f0' }
+          }
+        }
+      };
+    }
+
+    let returnChartMode = localStorage.getItem('inv_return_mode_v1') || 'twr';
+    function setReturnMode(mode) {
+      returnChartMode = mode;
+      localStorage.setItem('inv_return_mode_v1', mode);
+      renderCharts(calculateProcessedData());
+    }
+
     // Render Charts
     function renderCharts(processed) {
-      const labels = processed.map(p => fmtDateDisplay(p.date));
-
-      const dsCumulative = processed.map((p, i) => ({ x: i, y: p.cumulativeInvestedAll }));
-      const dsReal = processed.map((p, i) => ({ x: i, y: p.realTotal }));
-      const dsStock = processed.map((p, i) => ({ x: i, y: p.stockTotal }));
-      const dsWealth = processed.map((p, i) => ({ x: i, y: p.totalWealth }));
-      const dsMsci = processed.map((p, i) => ({ x: i, y: p.msciAllVal }));
-      const dsSp500 = processed.map((p, i) => ({ x: i, y: p.sp500AllVal }));
-      const dsTarget5 = processed.map((p, i) => ({ x: i, y: p.target5Val }));
-      const dsTarget9 = processed.map((p, i) => ({ x: i, y: p.target9Val }));
+      const xs = processed.map(p => dateToX(p.date));
+      const pts = (valueOf) => processed.map((p, i) => ({ x: xs[i], y: valueOf(p, i) }));
+      const markers = processed.length <= 36;
 
       // Chart 1: Patrimony
       const ctxPatrimony = document.getElementById('chartPatrimony').getContext('2d');
       if (chartPatrimonyInstance) chartPatrimonyInstance.destroy();
 
+      const K1 = 'patrimony';
+      // Un punto en "Total aportado" marca cada registro en el que metiste dinero
+      const aportPointRadius = processed.map(p => (p.flows.funds + p.flows.crypto + p.flows.t212) > 0.004 ? 3 : 0);
       chartPatrimonyInstance = new Chart(ctxPatrimony, {
         type: 'line',
         data: {
           datasets: [
-            {
-              label: 'Patrimonio Total',
-              data: dsWealth,
-              borderColor: '#4f46e5',
-              borderWidth: 3.5,
-              pointRadius: 4,
-              pointHoverRadius: 7,
-              fill: false,
-              tension: 0.25
-            },
-            {
-              label: 'MyInvestor + Cripto',
-              data: dsReal,
-              borderColor: '#0284c7',
-              borderWidth: 2.8,
-              pointRadius: 3.5,
-              pointHoverRadius: 6,
-              fill: false,
-              tension: 0.25
-            },
-            {
-              label: 'Acciones Trading 212',
-              data: dsStock,
-              borderColor: '#8b5cf6',
-              borderWidth: 2.8,
-              pointRadius: 3.5,
-              pointHoverRadius: 6,
-              fill: false,
-              tension: 0.25
-            },
-            {
-              label: 'Total Aportado',
-              data: dsCumulative,
-              borderColor: '#94a3b8',
-              borderDash: [5, 4],
-              borderWidth: 2,
-              pointRadius: 0,
-              fill: false,
-              tension: 0.1
-            },
-            {
-              label: 'MSCI World (Sim.)',
-              data: dsMsci,
-              borderColor: '#f59e0b',
-              borderDash: [6, 4],
-              borderWidth: 2,
-              pointRadius: 2,
-              fill: false,
-              tension: 0.25
-            },
-            {
-              label: 'S&P 500 (Sim.)',
-              data: dsSp500,
-              borderColor: '#f43f5e',
-              borderDash: [6, 4],
-              borderWidth: 2,
-              pointRadius: 2,
-              fill: false,
-              tension: 0.25
-            },
-            {
-              label: 'Target 5% Anual',
-              data: dsTarget5,
-              borderColor: '#10b98188',
-              borderDash: [3, 5],
-              borderWidth: 1.2,
-              pointRadius: 0,
-              fill: false,
-              tension: 0.2
-            },
-            {
-              label: 'Target 9% Anual',
-              data: dsTarget9,
-              borderColor: '#6366f188',
-              borderDash: [3, 5],
-              borderWidth: 1.2,
-              pointRadius: 0,
-              fill: false,
-              tension: 0.2
-            }
+            lineDataset(K1, 'wealth', 'Patrimonio total', pts(p => p.totalWealth), SERIES_COLORS.total, {
+              ds: {
+                borderWidth: 3,
+                pointRadius: markers ? 3 : 0,
+                // Zona entre lo que vale y lo que has puesto: verde si ganas, roja si pierdes
+                fill: { target: 1, above: 'rgba(16, 185, 129, .10)', below: 'rgba(239, 68, 68, .12)' }
+              }
+            }),
+            lineDataset(K1, 'invested', 'Total aportado', pts(p => p.cumulativeInvestedAll), SERIES_COLORS.invested, {
+              ds: { borderDash: [5, 4], stepped: true, pointRadius: aportPointRadius }
+            }),
+            lineDataset(K1, 'msci', 'MSCI World (mismo dinero)', pts(p => p.msciAllVal), SERIES_COLORS.msci, { ds: { borderDash: [6, 4] } }),
+            lineDataset(K1, 'sp500', 'S&P 500 (mismo dinero)', pts(p => p.sp500AllVal), SERIES_COLORS.sp500, { ds: { borderDash: [6, 4] } }),
+            lineDataset(K1, 'real', 'MyInvestor + Cripto', pts(p => p.realTotal), SERIES_COLORS.real, { hiddenByDefault: true }),
+            lineDataset(K1, 't212', 'Acciones Trading 212', pts(p => p.stockTotal), SERIES_COLORS.t212, { hiddenByDefault: true }),
+            lineDataset(K1, 'target5', 'Meta 5 % anual', pts(p => p.target5Val), SERIES_COLORS.target5, { hiddenByDefault: true, ds: { borderDash: [2, 4], borderWidth: 1.2 } }),
+            lineDataset(K1, 'target9', 'Meta 9 % anual', pts(p => p.target9Val), SERIES_COLORS.target9, { hiddenByDefault: true, ds: { borderDash: [2, 4], borderWidth: 1.2 } })
           ]
         },
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          events: ['click', 'touchstart'],
-          animation: false,
-          transitions: { zoom: { animation: { duration: 0 } } },
-          elements: {
-            point: { hitRadius: 15, hoverRadius: 8 }
-          },
-          interaction: {
-            mode: 'nearest',
-            intersect: true
-          },
-          onClick: (event, elements, chart) => {
-            if (!elements || elements.length === 0) {
-              chart.setActiveElements([]);
-              if (chart.tooltip) {
-                chart.tooltip.setActiveElements([], { x: 0, y: 0 });
-              }
-              chart.update();
-            }
-          },
-          plugins: {
-            legend: { labels: { color: '#334155', font: { family: 'Outfit', weight: '600' } } },
-            tooltip: {
-              events: ['click', 'touchstart'],
-              mode: 'nearest',
-              intersect: true,
-              callbacks: {
-                title: (items) => {
-                  if (!items || !items.length) return '';
-                  const idx = Math.round(items[0].parsed.x);
-                  return labels[idx] || '';
-                },
-                label: (ctx) => `${ctx.dataset.label}: ${fmtEur(ctx.raw.y !== undefined ? ctx.raw.y : ctx.raw)}`
-              }
-            },
-            zoom: {
-              pan: {
-                enabled: true,
-                mode: 'xy',
-                threshold: 0
-              },
-              zoom: {
-                wheel: { enabled: true, speed: 0.08 },
-                pinch: { enabled: true },
-                mode: 'xy'
-              }
-            }
-          },
-          scales: {
-            x: {
-              type: 'linear',
-              min: 0,
-              max: Math.max(0, processed.length - 1),
-              ticks: {
-                stepSize: 1,
-                color: '#64748b',
-                callback: (val) => {
-                  const idx = Math.round(val);
-                  if (idx >= 0 && idx < labels.length && Math.abs(val - idx) < 0.01) {
-                    return labels[idx];
-                  }
-                  return '';
-                }
-              },
-              grid: { color: '#e2e8f0' }
-            },
-            y: {
-              type: 'linear',
-              beginAtZero: false,
-              grace: '5%',
-              ticks: { color: '#64748b', callback: (v) => fmtEurShort(v), maxTicksLimit: 6 },
-              grid: { color: '#e2e8f0' }
-            }
-          }
-        }
+        options: baseLineOptions(K1, xs, processed, (v) => fmtEurShort(v), (v) => fmtEur(v))
       });
 
-      // Chart 2: Cumulative Return %
-      const dsReturnReal = processed.map((p, i) => ({ x: i, y: p.returnRealPct }));
-      const dsReturnStock = processed.map((p, i) => ({ x: i, y: p.returnStockPct }));
-      const dsReturnWealth = processed.map((p, i) => ({ x: i, y: p.returnTotalWealthPct }));
-      const dsReturnMsci = processed.map((p, i) => ({ x: i, y: p.returnMsciAllPct }));
-      const dsReturnSp500 = processed.map((p, i) => ({ x: i, y: p.returnSp500AllPct }));
-
+      // Chart 2: Rentabilidad acumulada (%)
+      // TWR: rentabilidad de la inversión sin el efecto de cuándo aportas (la que
+      // publican los fondos). "Sobre lo aportado": ganancia / dinero puesto.
       const ctxReturn = document.getElementById('chartReturn').getContext('2d');
       if (chartReturnInstance) chartReturnInstance.destroy();
+      document.querySelectorAll('#returnModeToggle .pill-btn').forEach(b =>
+        b.classList.toggle('active', b.getAttribute('data-mode') === returnChartMode));
+      const subtitle = document.getElementById('returnChartSubtitle');
 
+      const K2 = 'return';
+      let retSets;
+      if (returnChartMode === 'twr') {
+        if (subtitle) subtitle.textContent = 'TWR: cómo rinde cada euro, sin que influya cuándo ni cuánto aportas';
+        const risk = computeRisk(processed) || { series: {} };
+        const twr = (serie) => processed.map((p, i) => ({
+          x: xs[i],
+          y: serie && serie.length ? (serie[i].value / serie[0].value - 1) * 100 : null
+        }));
+        retSets = [
+          lineDataset(K2, 'wealth', 'Patrimonio total', twr(risk.series.total), SERIES_COLORS.total, { ds: { borderWidth: 3, pointRadius: markers ? 3 : 0 } }),
+          lineDataset(K2, 'msci', 'MSCI World', twr(risk.series.msci), SERIES_COLORS.msci, { ds: { borderDash: [6, 4] } }),
+          lineDataset(K2, 'sp500', 'S&P 500', twr(risk.series.sp500), SERIES_COLORS.sp500, { ds: { borderDash: [6, 4] } }),
+          lineDataset(K2, 'real', 'MyInvestor + Cripto', twr(risk.series.real), SERIES_COLORS.real),
+          lineDataset(K2, 't212', 'Acciones Trading 212', twr(risk.series.t212), SERIES_COLORS.t212)
+        ];
+      } else {
+        if (subtitle) subtitle.textContent = 'Ganancia sobre el dinero aportado a cada cuenta (los índices, con todo tu dinero)';
+        retSets = [
+          lineDataset(K2, 'wealth', 'Patrimonio total', pts(p => p.returnTotalWealthPct), SERIES_COLORS.total, { ds: { borderWidth: 3, pointRadius: markers ? 3 : 0 } }),
+          lineDataset(K2, 'msci', 'MSCI World', pts(p => p.returnMsciAllPct), SERIES_COLORS.msci, { ds: { borderDash: [6, 4] } }),
+          lineDataset(K2, 'sp500', 'S&P 500', pts(p => p.returnSp500AllPct), SERIES_COLORS.sp500, { ds: { borderDash: [6, 4] } }),
+          lineDataset(K2, 'real', 'MyInvestor + Cripto', pts(p => p.cumulativeInvested > 0 ? p.returnRealPct : null), SERIES_COLORS.real),
+          lineDataset(K2, 't212', 'Acciones Trading 212', pts(p => p.cumulativeInvestedStock > 0 ? p.returnStockPct : null), SERIES_COLORS.t212)
+        ];
+      }
       chartReturnInstance = new Chart(ctxReturn, {
         type: 'line',
-        data: {
-          datasets: [
-            {
-              label: 'Patrimonio Total %',
-              data: dsReturnWealth,
-              borderColor: '#4f46e5',
-              borderWidth: 3.5,
-              pointRadius: 4,
-              pointHoverRadius: 7,
-              tension: 0.25
-            },
-            {
-              label: 'MyInvestor + Cripto %',
-              data: dsReturnReal,
-              borderColor: '#0284c7',
-              borderWidth: 2.8,
-              pointRadius: 3.5,
-              pointHoverRadius: 6,
-              tension: 0.25
-            },
-            {
-              label: 'Acciones Trading 212 %',
-              data: dsReturnStock,
-              borderColor: '#8b5cf6',
-              borderWidth: 2.8,
-              pointRadius: 3.5,
-              pointHoverRadius: 6,
-              tension: 0.25
-            },
-            {
-              label: 'MSCI World %',
-              data: dsReturnMsci,
-              borderColor: '#f59e0b',
-              borderDash: [6, 4],
-              borderWidth: 2,
-              pointRadius: 2,
-              tension: 0.25
-            },
-            {
-              label: 'S&P 500 %',
-              data: dsReturnSp500,
-              borderColor: '#f43f5e',
-              borderDash: [6, 4],
-              borderWidth: 2,
-              pointRadius: 2,
-              tension: 0.25
-            }
-          ]
-        },
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          events: ['click', 'touchstart'],
-          animation: false,
-          transitions: { zoom: { animation: { duration: 0 } } },
-          elements: {
-            point: { hitRadius: 15, hoverRadius: 8 }
-          },
-          interaction: {
-            mode: 'nearest',
-            intersect: true
-          },
-          onClick: (event, elements, chart) => {
-            if (!elements || elements.length === 0) {
-              chart.setActiveElements([]);
-              if (chart.tooltip) {
-                chart.tooltip.setActiveElements([], { x: 0, y: 0 });
-              }
-              chart.update();
-            }
-          },
-          plugins: {
-            legend: { labels: { color: '#334155', font: { family: 'Outfit', weight: '600' } } },
-            tooltip: {
-              events: ['click', 'touchstart'],
-              mode: 'nearest',
-              intersect: true,
-              callbacks: {
-                title: (items) => {
-                  if (!items || !items.length) return '';
-                  const idx = Math.round(items[0].parsed.x);
-                  return labels[idx] || '';
-                },
-                label: (ctx) => `${ctx.dataset.label}: ${fmtPct(ctx.raw.y !== undefined ? ctx.raw.y : ctx.raw)}`
-              }
-            },
-            zoom: {
-              pan: {
-                enabled: true,
-                mode: 'xy',
-                threshold: 0
-              },
-              zoom: {
-                wheel: { enabled: true, speed: 0.08 },
-                pinch: { enabled: true },
-                mode: 'xy'
-              }
-            }
-          },
-          scales: {
-            x: {
-              type: 'linear',
-              min: 0,
-              max: Math.max(0, processed.length - 1),
-              ticks: {
-                stepSize: 1,
-                color: '#64748b',
-                callback: (val) => {
-                  const idx = Math.round(val);
-                  if (idx >= 0 && idx < labels.length && Math.abs(val - idx) < 0.01) {
-                    return labels[idx];
-                  }
-                  return '';
-                }
-              },
-              grid: { color: '#e2e8f0' }
-            },
-            y: {
-              type: 'linear',
-              beginAtZero: false,
-              grace: '5%',
-              ticks: { color: '#64748b', callback: (v) => fmtPct(v) },
-              grid: { color: '#e2e8f0' }
-            }
-          }
-        }
+        data: { datasets: retSets },
+        options: baseLineOptions(K2, xs, processed, (v) => fmtPct(v), (v) => fmtPct(v))
       });
 
       // Chart 3 & 4: Asset Donut & 3-Pillars Donut
@@ -3082,8 +3241,9 @@
           const ctxPillars = elPillars.getContext('2d');
           if (chartPillarsInstance) chartPillarsInstance.destroy();
 
-          const cryptoVal = (last.assets && last.assets['crypto']) ? parseFloat(last.assets['crypto']) : 0;
-          const fundsVal = Math.max(0, last.realTotal - cryptoVal);
+          // Suma por cuenta (antes solo contaba el activo con id 'crypto')
+          const cryptoVal = Math.max(0, last.cryptoValue || 0);
+          const fundsVal = Math.max(0, last.fundsValue || 0);
           const stocksVal = last.stockTotal || 0;
           const totalPillars = fundsVal + stocksVal + cryptoVal || 1;
 
@@ -3466,13 +3626,18 @@
         return;
       }
 
-      processed.slice().reverse().forEach((r, revIdx) => {
-        const realIdx = processed.length - 1 - revIdx;
+      processed.slice().reverse().forEach((r) => {
+        // Índice en `records`, no en la lista filtrada: con un filtro de fechas
+        // activo, editar/borrar apuntaba antes a otro registro.
+        const realIdx = r._idx;
         const tr = document.createElement('tr');
+        const extra = [];
+        if (r.flows.t212) extra.push(`+ ${fmtEur(r.flows.t212)} T212`);
+        if (r.estimatedBalances) extra.push('<span title="Este registro no traía saldos nuevos: la aportación se ha sumado al último saldo conocido">sumada al saldo</span>');
 
         tr.innerHTML = `
           <td class="text-bold">${fmtDateDisplay(r.date)}</td>
-          <td>${fmtEur(r.aport)}</td>
+          <td>${fmtEur(r.aport)}${extra.length ? `<div class="text-muted" style="font-size: .72rem;">${extra.join(' · ')}</div>` : ''}</td>
           <td>${fmtEur(r.cumulativeInvested)}</td>
           <td class="text-bold">${fmtEur(r.realTotal)}</td>
           <td class="${r.gainReal >= 0 ? 'text-success' : 'text-danger'}">${fmtEur(r.gainReal)}</td>
@@ -3494,58 +3659,235 @@
       });
     }
 
-    // Calculate Rebalance Suggestions
-    function calculateRebalance() {
-      const processed = calculateProcessedData();
-      if (processed.length === 0) return;
+    // Estado efectivo (saldos arrastrados) en una fecha: el del último registro
+    // con fecha <= date. Sin filtro de periodo: siempre el histórico completo.
+    function effectiveStateAt(date, excludeIdx) {
+      const all = calculateAllProcessed();
+      let st = null;
+      all.forEach(p => {
+        if (p._idx === excludeIdx) return;
+        if (!date || p.date <= date) st = p;
+      });
+      return st
+        ? { assets: st.assets || {}, stockTotal: st.stockTotal || 0, totalWealth: st.totalWealth || 0, date: st.date }
+        : { assets: {}, stockTotal: 0, totalWealth: 0, date: null };
+    }
 
-      const last = processed[processed.length - 1];
-      const input = document.getElementById('nextAportInput');
-      const nextAport = input ? (parseFloat(input.value) || 0) : 0;
-      const totalNow = last.totalWealth || 0;
-      const targetPortfolioTotal = totalNow + nextAport;
-
-      const tbody = document.getElementById('rebalanceTableBody');
-      if (!tbody) return;
-      tbody.innerHTML = '';
-
+    // Reparte `amount` € priorizando lo que más lejos está de su objetivo (sin vender).
+    // Devuelve una fila por activo + Trading 212 (key '__t212'), con céntimos cuadrados.
+    function rebalanceSplit(amount, state) {
       const rows = assetsConfig.map(asset => ({
+        key: asset.id,
         name: asset.name,
+        pillar: assetPillar(asset),
         target: Number(asset.target) || 0,
-        currentVal: (last.assets && last.assets[asset.id]) ? parseFloat(last.assets[asset.id]) : 0
+        currentVal: Math.max(0, parseFloat(state.assets[asset.id]) || 0)
       }));
       rows.push({
+        key: '__t212',
         name: 'Trading 212 (acciones)',
+        pillar: 't212',
         target: Number(appSettings.stockTarget) || 0,
-        currentVal: last.stockTotal || 0
+        currentVal: Math.max(0, state.stockTotal || 0)
       });
-
+      const totalNow = state.totalWealth || rows.reduce((s, r) => s + r.currentVal, 0);
+      const targetPortfolioTotal = totalNow + amount;
       const targetSum = rows.reduce((s, r) => s + r.target, 0) || 100;
       rows.forEach(r => {
         r.targetVal = targetPortfolioTotal * (r.target / targetSum);
         r.needed = Math.max(0, r.targetVal - r.currentVal);
       });
       const totalNeeded = rows.reduce((s, r) => s + r.needed, 0);
+      rows.forEach(r => {
+        const raw = totalNeeded > 0 ? (r.needed / totalNeeded) * amount : amount * (r.target / targetSum);
+        r.buy = Math.round(raw * 100) / 100;
+      });
+      // Cuadrar céntimos en la fila con más compra
+      const diff = Math.round((amount - rows.reduce((s, r) => s + r.buy, 0)) * 100) / 100;
+      if (Math.abs(diff) >= 0.01) {
+        const big = rows.reduce((a, b) => (b.buy > a.buy ? b : a), rows[0]);
+        big.buy = Math.round((big.buy + diff) * 100) / 100;
+      }
+      rows.forEach(r => {
+        r.currentWeight = totalNow > 0 ? (r.currentVal / totalNow) * 100 : 0;
+        r.newWeight = targetPortfolioTotal > 0 ? ((r.currentVal + r.buy) / targetPortfolioTotal) * 100 : 0;
+      });
+      return rows;
+    }
+
+    // Calculate Rebalance Suggestions
+    function calculateRebalance() {
+      const tbody = document.getElementById('rebalanceTableBody');
+      if (!tbody) return;
+      tbody.innerHTML = '';
+      if (!records.length) return;
+
+      const input = document.getElementById('nextAportInput');
+      const nextAport = input ? (parseFloat(String(input.value).replace(',', '.')) || 0) : 0;
+      // Siempre con los saldos más recientes, aunque haya un filtro de fechas puesto
+      const rows = rebalanceSplit(nextAport, effectiveStateAt(null));
 
       rows.forEach(r => {
-        const buy = totalNeeded > 0 ? (r.needed / totalNeeded) * nextAport : nextAport * (r.target / targetSum);
-        const newWeight = targetPortfolioTotal > 0 ? ((r.currentVal + buy) / targetPortfolioTotal) * 100 : 0;
-        const currentWeight = totalNow > 0 ? (r.currentVal / totalNow) * 100 : 0;
-
         const tr = document.createElement('tr');
         tr.innerHTML = `
           <td class="text-bold">${r.name}</td>
           <td>${r.target.toFixed(1)}%</td>
           <td>${fmtEur(r.currentVal)}</td>
-          <td>${currentWeight.toFixed(1)}%</td>
-          <td class="text-bold text-success">+${fmtEur(buy)}</td>
-          <td>${newWeight.toFixed(1)}%</td>
+          <td>${r.currentWeight.toFixed(1)}%</td>
+          <td class="text-bold ${r.buy > 0 ? 'text-success' : 'text-muted'}">${r.buy > 0 ? '+' : ''}${fmtEur(r.buy)}</td>
+          <td>${r.newWeight.toFixed(1)}%</td>
         `;
         tbody.appendChild(tr);
       });
     }
 
-    
+    function registerRebalanceAport() {
+      const input = document.getElementById('nextAportInput');
+      const amount = input ? (parseFloat(String(input.value).replace(',', '.')) || 0) : 0;
+      if (!(amount > 0)) { alert('Pon primero cuánto vas a aportar.'); return; }
+      const split = {};
+      rebalanceSplit(amount, effectiveStateAt(null)).forEach(r => { if (r.buy > 0) split[r.key] = r.buy; });
+      openQuickModal(split, amount);
+    }
+
+    // ================= APORTACIÓN RÁPIDA =================
+    // Para meter dinero sin tener que mirar todos los saldos: cada euro se suma
+    // al último saldo conocido del activo al que va. Cuando vuelvas a registrar
+    // saldos reales, esos mandan.
+    const parseAmount = (v) => {
+      const n = parseFloat(String(v || '').trim().replace(/\s/g, '').replace(',', '.'));
+      return isNaN(n) ? 0 : n;
+    };
+
+    function localToday() {
+      const d = new Date();
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    }
+
+    function navPlaceholder(key) {
+      for (let i = records.length - 1; i >= 0; i--) {
+        const v = parseFloat(records[i][key]);
+        if (v > 0) return `vacío = estimado (últ. ${v.toLocaleString('es-ES', { maximumFractionDigits: 4 })})`;
+      }
+      return 'vacío = estimado por fecha';
+    }
+
+    function openQuickModal(prefill, total) {
+      const pre = prefill || {};
+      document.getElementById('quickForm').reset();
+      document.getElementById('quickDate').value = localToday();
+      document.getElementById('quickTotal').value = total ? String(total) : '';
+      document.getElementById('quickMsciNav').placeholder = navPlaceholder('msciNav');
+      document.getElementById('quickSp500Nav').placeholder = navPlaceholder('sp500Nav');
+      renderQuickRows(pre);
+      document.getElementById('modalQuick').classList.add('active');
+      updateQuickSummary();
+    }
+
+    function closeQuickModal() {
+      document.getElementById('modalQuick').classList.remove('active');
+    }
+
+    function renderQuickRows(prefill) {
+      prefill = prefill || {};
+      const state = effectiveStateAt(document.getElementById('quickDate').value || null);
+      const groups = { myinvestor: document.getElementById('quickFunds'), crypto: document.getElementById('quickCrypto') };
+      Object.values(groups).forEach(g => { if (g) g.innerHTML = ''; });
+      const row = (key, name, saldo) => {
+        const v = prefill[key];
+        return `<div class="quick-row">
+            <label for="quick_${key}">${name}<small>saldo: ${fmtEur(saldo)}</small></label>
+            <input type="text" inputmode="decimal" id="quick_${key}" class="form-control quick-input" data-key="${key}" value="${v ? String(v).replace('.', ',') : ''}" placeholder="0" oninput="updateQuickSummary()">
+          </div>`;
+      };
+      assetsConfig.forEach(a => {
+        const g = groups[assetPillar(a)];
+        if (g) g.insertAdjacentHTML('beforeend', row(a.id, a.name, parseFloat(state.assets[a.id]) || 0));
+      });
+      const st = document.getElementById('quickStock');
+      if (st) st.innerHTML = row('__t212', 'Trading 212 (acciones)', state.stockTotal || 0);
+      const cryptoBlock = document.getElementById('quickCryptoBlock');
+      if (cryptoBlock) cryptoBlock.style.display = groups.crypto && groups.crypto.children.length ? '' : 'none';
+    }
+
+    function quickAmounts() {
+      const out = {};
+      document.querySelectorAll('.quick-input').forEach(inp => {
+        const v = parseAmount(inp.value);
+        if (Math.abs(v) >= 0.005) out[inp.getAttribute('data-key')] = Math.round(v * 100) / 100;
+      });
+      return out;
+    }
+
+    function quickDistribute() {
+      const total = parseAmount(document.getElementById('quickTotal').value);
+      if (!(total > 0)) { alert('Pon el importe total que vas a aportar.'); return; }
+      const state = effectiveStateAt(document.getElementById('quickDate').value || null);
+      const split = {};
+      rebalanceSplit(total, state).forEach(r => { if (r.buy > 0) split[r.key] = r.buy; });
+      renderQuickRows(split);
+      updateQuickSummary();
+    }
+
+    function updateQuickSummary() {
+      const el = document.getElementById('quickSummary');
+      if (!el) return;
+      const am = quickAmounts();
+      let funds = 0, crypto = 0, t212 = 0;
+      Object.keys(am).forEach(k => {
+        if (k === '__t212') t212 += am[k];
+        else if (keyPillar(k) === 'crypto') crypto += am[k];
+        else funds += am[k];
+      });
+      const sum = funds + crypto + t212;
+      const total = parseAmount(document.getElementById('quickTotal').value);
+      const parts = [];
+      if (funds) parts.push(`MyInvestor ${fmtEur(funds)}`);
+      if (crypto) parts.push(`Cripto ${fmtEur(crypto)}`);
+      if (t212) parts.push(`T212 ${fmtEur(t212)}`);
+      let warn = '';
+      if (total > 0 && Math.abs(total - sum) >= 0.01) {
+        warn = `<div class="quick-warn">El reparto suma ${fmtEur(sum)} y has puesto ${fmtEur(total)} de total: faltan ${fmtEur(total - sum)}.</div>`;
+      }
+      el.innerHTML = `<strong>Total: ${fmtEur(sum)}</strong>${parts.length ? ' · ' + parts.join(' · ') : ''}${warn}`;
+    }
+
+    function saveQuickAport(e) {
+      e.preventDefault();
+      const date = document.getElementById('quickDate').value;
+      if (!date) { alert('Falta la fecha.'); return; }
+      const am = quickAmounts();
+      if (!Object.keys(am).length) { alert('Pon cuánto aportas en al menos un fondo o cuenta.'); return; }
+
+      const state = effectiveStateAt(date);
+      const assets = {};
+      let funds = 0, crypto = 0, t212 = 0;
+      Object.keys(am).forEach(k => {
+        if (k === '__t212') { t212 += am[k]; return; }
+        assets[k] = Math.round(((parseFloat(state.assets[k]) || 0) + am[k]) * 100) / 100;
+        if (keyPillar(k) === 'crypto') crypto += am[k]; else funds += am[k];
+      });
+      const msciRaw = document.getElementById('quickMsciNav').value.trim();
+      const spRaw = document.getElementById('quickSp500Nav').value.trim();
+      const round2 = (x) => Math.round(x * 100) / 100;
+
+      records.push({
+        date,
+        kind: 'aport',
+        aport: round2(funds + crypto),
+        flows: { myinvestor: round2(funds), crypto: round2(crypto), t212: round2(t212) },
+        msciNav: msciRaw === '' ? null : (parseAmount(msciRaw) || null),
+        sp500Nav: spRaw === '' ? null : (parseAmount(spRaw) || null),
+        stockAport: round2(t212),
+        stockTotal: t212 ? round2((state.stockTotal || 0) + t212) : null,
+        assets
+      });
+      sortRecords();
+      saveData();
+      renderAll();
+      closeQuickModal();
+    }
+
     let ddChart = null;
 
     function renderRisk(processed) {
@@ -3588,10 +3930,12 @@
           `<div class="basis-item"><span class="k">${label}</span><span class="v">${value}${sub ? `<small>${sub}</small>` : ''}</span></div>`;
         basisEl.innerHTML = [
           item('Registros analizados', b.n, `${shortDate(b.from)} → ${shortDate(b.to)}`),
-          item('Cada cuánto registras', b.avgDays + ' días', `${b.days} días en total`),
+          item('Cada cuánto registras', b.avgDays + ' días', `${b.days} días en total · ${b.nObserved} con saldos`),
           item('Dinero aportado', fmtEur(b.investedAll), 'fondos + cripto + acciones'),
           item('Precio MSCI World', nav(b.msci), b.msci ? 'en tu registro del ' + shortDate(b.msci.date) : 'sin precios anotados'),
-          item('Precio S&P 500', nav(b.sp500), b.sp500 ? 'en tu registro del ' + shortDate(b.sp500.date) : 'sin precios anotados')
+          item('Precio S&P 500', nav(b.sp500), b.sp500 ? 'en tu registro del ' + shortDate(b.sp500.date) : 'sin precios anotados'),
+          item('Aportaciones sin saldo', b.nAutoFlow, b.nAutoFlow ? 'sumadas al último saldo; fuera de volatilidad y beta' : 'todas con saldos actualizados'),
+          item('Precios estimados', b.nNavEstimated, b.nNavEstimated ? 'registros sin precio: interpolado por fecha' : 'todos los registros con precio')
         ].join('');
       }
 
@@ -3629,131 +3973,127 @@
       // Cuántos puntos sostienen cada columna
       const trN = document.createElement('tr');
       trN.innerHTML = '<td class="small">Observaciones</td>' + risk.columns.map(c =>
-        `<td class="small">${c.series.length || 0}</td>`).join('');
+        `<td class="small">${c.series.length ? risk.basis.nObserved : 0}</td>`).join('');
       body.appendChild(trN);
 
       const canvas = document.getElementById('chartDrawdown');
       if (!canvas) return;
       if (ddChart) { ddChart.destroy(); ddChart = null; }
+      const ddXs = risk.labels.map(dateToX);
+      const ddData = (arr) => arr.map((y, i) => ({ x: ddXs[i], y }));
       ddChart = new Chart(canvas, {
         type: 'line',
         data: {
-          labels: risk.labels.map(d => fmtDateDisplay(d)),
           datasets: [
             {
               label: 'Tu cartera',
-              data: risk.drawdown.total,
-              borderColor: '#4f46e5',
+              data: ddData(risk.drawdown.total),
+              borderColor: SERIES_COLORS.total,
               backgroundColor: 'rgba(79, 70, 229, .10)',
-              fill: true, pointRadius: 0, borderWidth: 2, tension: .25
+              fill: true, pointRadius: 0, borderWidth: 2, tension: 0
             },
             {
               label: 'MSCI World',
-              data: risk.drawdown.msci,
-              borderColor: '#94a3b8',
-              borderDash: [5, 4], fill: false, pointRadius: 0, borderWidth: 1.5, tension: .25
+              data: ddData(risk.drawdown.msci),
+              borderColor: SERIES_COLORS.msci,
+              borderDash: [6, 4], fill: false, pointRadius: 0, borderWidth: 1.5, tension: 0
             },
             {
               label: 'S&P 500',
-              data: risk.drawdown.sp500,
-              borderColor: '#f59e0b',
-              borderDash: [2, 3], fill: false, pointRadius: 0, borderWidth: 1.5, tension: .25
+              data: ddData(risk.drawdown.sp500),
+              borderColor: SERIES_COLORS.sp500,
+              borderDash: [6, 4], fill: false, pointRadius: 0, borderWidth: 1.5, tension: 0
             }
           ]
         },
         options: {
           responsive: true,
           maintainAspectRatio: false,
+          animation: false,
           interaction: { mode: 'index', intersect: false },
           plugins: {
-            legend: { position: 'bottom' },
+            legend: { position: 'bottom', labels: { usePointStyle: true, pointStyle: 'line' } },
             tooltip: {
               callbacks: {
+                title: (items) => items.length ? xToDateLabel(items[0].parsed.x) : '',
                 label: (ctx) => `${ctx.dataset.label}: ${ctx.parsed.y.toFixed(1).replace('.', ',')}%`
               }
             }
           },
           scales: {
-            y: { ticks: { callback: v => v + '%' } },
-            x: { ticks: { maxTicksLimit: 8 } }
+            y: { ticks: { callback: v => v + '%' }, grid: { color: '#e2e8f0' } },
+            x: timeAxis(ddXs)
           }
         }
       });
     }
 
+    // Rentabilidad por año natural con TWR (la misma vara que la pestaña de riesgo
+    // y el KPI): cada año se mide desde el último registro del año anterior, así
+    // las aportaciones no inflan ni hunden el porcentaje.
     function renderAnnualStats(processed) {
       const tbody = document.getElementById('annualStatsTableBody');
       if (!tbody) return;
       tbody.innerHTML = '';
       if (processed.length === 0) return;
+      const risk = computeRisk(processed);
+      const S = risk.series;
 
-      // Group by Year
       const byYear = {};
-      processed.forEach(p => {
+      processed.forEach((p, i) => {
         const year = p.date.substring(0, 4);
-        if (!byYear[year]) byYear[year] = [];
-        byYear[year].push(p);
+        if (!byYear[year]) byYear[year] = { first: i, last: i };
+        byYear[year].last = i;
       });
-
       const years = Object.keys(byYear).sort();
-      
-      let prevYearLastRecord = null;
+      const flowAll = p => p.flows.funds + p.flows.crypto + p.flows.t212;
 
-      years.forEach(year => {
-        const recordsOfYear = byYear[year];
-        const lastRec = recordsOfYear[recordsOfYear.length - 1];
-        
-        // Calculate total aports in this year
-        let aportFondosYear = 0;
-        let aportStocksYear = 0;
-        recordsOfYear.forEach(r => {
-          aportFondosYear += r.aport;
-          aportStocksYear += r.stockAport;
-        });
-        const aportTotalYear = aportFondosYear + aportStocksYear;
+      const badge = (v) => v === null
+        ? '<span class="text-muted">—</span>'
+        : `<span class="badge ${v >= 0 ? 'badge-success' : 'badge-danger'}">${fmtPct(v)}</span>`;
 
-        // Base values (Start of year)
-        const startFondos = prevYearLastRecord ? prevYearLastRecord.realTotal : 0;
-        const startStocks = prevYearLastRecord ? prevYearLastRecord.stockTotal : 0;
-        const startTotalW = prevYearLastRecord ? prevYearLastRecord.totalWealth : 0;
-        const startMsci = prevYearLastRecord ? prevYearLastRecord.msciAllVal : 0;
-        const startSp500 = prevYearLastRecord ? prevYearLastRecord.sp500AllVal : 0;
-
-        // End values
-        const endFondos = lastRec.realTotal;
-        const endStocks = lastRec.stockTotal;
-        const endTotalW = lastRec.totalWealth;
-        const endMsci = lastRec.msciAllVal;
-        const endSp500 = lastRec.sp500AllVal;
-
-        // Calculate simplified annual return: (End - Start - Aports) / (Start + Aports)
-        // Note: This is an approximation (Modified Dietz without precise day weighting, but perfectly fine for yearly summary if aports are somewhat evenly distributed, or just a rough year-end metric).
-        const calcRet = (end, start, aport) => {
-          const invested = start + aport;
-          if (invested <= 0) return 0;
-          return ((end - invested) / invested) * 100;
+      years.forEach((year, yi) => {
+        const { first, last } = byYear[year];
+        // Base: último registro del año anterior; el primer año parte de su primer registro
+        const base = yi === 0 ? first : byYear[years[yi - 1]].last;
+        const ret = (serie) => {
+          if (!serie || !serie.length || base === last) return null;
+          const a = serie[base].value, b = serie[last].value;
+          return a > 0 ? (b / a - 1) * 100 : null;
         };
 
-        const retFondos = calcRet(endFondos, startFondos, aportFondosYear);
-        const retStocks = calcRet(endStocks, startStocks, aportStocksYear);
-        const retTotalW = calcRet(endTotalW, startTotalW, aportTotalYear);
-        const retMsci = calcRet(endMsci, startMsci, aportTotalYear); // índice con TODO el dinero aportado
-        const retSp500 = calcRet(endSp500, startSp500, aportTotalYear);
+        const aportYear = processed.slice(first, last + 1).reduce((s, p) => s + flowAll(p), 0);
+        // Ganancia del año = lo que ha crecido el patrimonio menos lo que has metido
+        const flowsAfterBase = processed.slice(base + 1, last + 1).reduce((s, p) => s + flowAll(p), 0);
+        const gainYear = processed[last].totalWealth - processed[base].totalWealth - flowsAfterBase;
+
+        const retReal = ret(S.real);
+        const retStock = ret(S.t212);
+        const retTotal = ret(S.total);
+        const retMsci = ret(S.msci);
+        const retSp = ret(S.sp500);
+        const diff = (retTotal !== null && retMsci !== null) ? retTotal - retMsci : null;
+        const partial = (yi === 0 && first === base) || year === processed[processed.length - 1].date.substring(0, 4);
+        const fromLabel = fmtDateDisplay(processed[base].date);
+        const toLabel = fmtDateDisplay(processed[last].date);
 
         const tr = document.createElement('tr');
         tr.innerHTML = `
-          <td class="text-bold">${year}</td>
-          <td>${fmtEur(aportTotalYear)}</td>
-          <td class="col-fondos"><span class="badge ${retFondos >= 0 ? 'badge-success' : 'badge-danger'}">${fmtPct(retFondos)}</span></td>
-          <td class="col-acciones"><span class="badge ${retStocks >= 0 ? 'badge-success' : 'badge-danger'}">${fmtPct(retStocks)}</span></td>
-          <td class="col-total"><span class="badge ${retTotalW >= 0 ? 'badge-success' : 'badge-danger'}">${fmtPct(retTotalW)}</span></td>
-          <td class="col-msci"><span class="badge ${retMsci >= 0 ? 'badge-success' : 'badge-danger'}">${fmtPct(retMsci)}</span></td>
-          <td class="col-sp500"><span class="badge ${retSp500 >= 0 ? 'badge-success' : 'badge-danger'}">${fmtPct(retSp500)}</span></td>
+          <td class="text-bold">${year}${partial ? `<div class="text-muted" style="font-size: .72rem; font-weight: 500;">${fromLabel} → ${toLabel}</div>` : ''}</td>
+          <td>${fmtEur(aportYear)}</td>
+          <td class="col-gain ${gainYear >= 0 ? 'text-success' : 'text-danger'}">${base === last ? '—' : fmtEur(gainYear)}</td>
+          <td class="col-fondos">${badge(retReal)}</td>
+          <td class="col-acciones">${badge(retStock)}</td>
+          <td class="col-total">${badge(retTotal)}</td>
+          <td class="col-msci">${badge(retMsci)}</td>
+          <td class="col-sp500">${badge(retSp)}</td>
+          <td class="col-diff ${diff === null ? '' : (diff >= 0 ? 'text-success' : 'text-danger')}" style="font-weight: 700;">
+            ${diff === null ? '—' : (diff >= 0 ? '+' : '') + diff.toFixed(1).replace('.', ',') + ' pp'}
+          </td>
         `;
         tbody.appendChild(tr);
-
-        prevYearLastRecord = lastRec;
       });
+      applyAnnualColumnVisibility();
     }
 
     // Tabs Switcher
@@ -3778,18 +4118,22 @@
       
       renderDynamicAssetInputs(lastKnownAssets());
 
-      const todayStr = new Date().toISOString().slice(0, 10);
-      document.getElementById('inputDate').value = todayStr;
+      document.getElementById('inputDate').value = localToday();
       document.getElementById('inputAport').value = "";
       document.getElementById('inputCryptoAport').value = "";
       document.getElementById('inputStockAport').value = "";
       document.getElementById('inputStockTotal').value = lastKnownValue('stockTotal');
 
-      document.getElementById('inputMsciNav').value = lastKnownValue('msciNav');
-      document.getElementById('inputSp500Nav').value = lastKnownValue('sp500Nav');
+      // Precios vacíos a propósito: copiar el del registro anterior haría que el
+      // índice "comprara" a un precio viejo. Vacío = estimado por fecha.
+      document.getElementById('inputMsciNav').value = '';
+      document.getElementById('inputSp500Nav').value = '';
+      document.getElementById('inputMsciNav').placeholder = navPlaceholder('msciNav');
+      document.getElementById('inputSp500Nav').placeholder = navPlaceholder('sp500Nav');
 
       setPillarChips({ myinvestor: true, t212: true, crypto: true });
       document.getElementById('modalForm').classList.add('active');
+      updateRecordChecks();
     }
 
     function openEditModal(index) {
@@ -3806,10 +4150,14 @@
       document.getElementById('inputStockAport').value = r.stockAport || "";
       document.getElementById('inputStockTotal').value = (r.stockTotal === 0 || r.stockTotal) ? r.stockTotal : "";
 
+      document.getElementById('inputMsciNav').placeholder = 'vacío = estimado por fecha';
+      document.getElementById('inputSp500Nav').placeholder = 'vacío = estimado por fecha';
+
       renderDynamicAssetInputs(r.assets || {});
       setPillarChips({ myinvestor: true, t212: true, crypto: true });
 
       document.getElementById('modalForm').classList.add('active');
+      updateRecordChecks();
     }
 
     // Ultimo valor conocido de cada activo y de cada campo simple.
@@ -3877,24 +4225,145 @@
       document.getElementById('modalForm').classList.remove('active');
     }
 
+    // ===== Comprobación en vivo del formulario de saldos =====
+    // Por cada cuenta: saldo anterior → nuevo, aportación y lo que queda, que es
+    // lo que ha hecho el mercado. Si hay aportación pero los saldos no se han
+    // tocado, ofrece sumarla a un fondo en vez de dejar que parezca una pérdida.
+    function recordFormState() {
+      const editIndex = parseInt(document.getElementById('editIndex').value);
+      const date = document.getElementById('inputDate').value || null;
+      return effectiveStateAt(date, editIndex >= 0 ? editIndex : undefined);
+    }
+
+    function pillarFormNumbers(pillar, state) {
+      if (pillar === 't212') {
+        const raw = document.getElementById('inputStockTotal').value.trim();
+        const before = state.stockTotal || 0;
+        return {
+          before,
+          after: raw === '' ? before : (parseFloat(raw) || 0),
+          aport: parseFloat(document.getElementById('inputStockAport').value) || 0
+        };
+      }
+      const prev = (id) => parseFloat(state.assets[id]) || 0;
+      const assets = assetsConfig.filter(a => assetPillar(a) === pillar);
+      let before = 0, after = 0;
+      assets.forEach(a => {
+        before += prev(a.id);
+        const el = document.getElementById('input_asset_' + a.id);
+        const raw = el ? el.value.trim() : '';
+        after += raw === '' ? prev(a.id) : (parseFloat(raw) || 0);
+      });
+      const aportId = pillar === 'crypto' ? 'inputCryptoAport' : 'inputAport';
+      return { before, after, aport: parseFloat(document.getElementById(aportId).value) || 0, assets };
+    }
+
+    function updateRecordChecks() {
+      const state = recordFormState();
+      ['myinvestor', 'crypto', 't212'].forEach(pillar => {
+        const el = document.getElementById('check-' + pillar);
+        if (!el) return;
+        const n = pillarFormNumbers(pillar, state);
+        if (pillar !== 't212' && !n.assets.length) { el.style.display = 'none'; return; }
+        el.style.display = '';
+        el.className = 'flow-check';
+        if (!state.date) {
+          el.innerHTML = 'Primer registro: estos saldos son el punto de partida.';
+          return;
+        }
+        const delta = n.after - n.before;
+        const signed = (v) => (v >= 0 ? '+' : '') + fmtEur(v);
+        if (Math.abs(n.aport) < 0.005 && Math.abs(delta) < 0.005) {
+          el.innerHTML = `Sin cambios: se mantiene el último saldo (${fmtEur(n.before)}).`;
+          return;
+        }
+        if (Math.abs(n.aport) >= 0.005 && Math.abs(delta) < 0.005) {
+          el.className = 'flow-check warn';
+          const opts = pillar === 't212'
+            ? ''
+            : `<select id="dest-${pillar}">
+                 <option value="__prop">repartida en proporción</option>
+                 ${n.assets.map(a => `<option value="${a.id}">${a.name}</option>`).join('')}
+               </select>`;
+          el.innerHTML = `Has puesto ${fmtEur(n.aport)} de aportación pero el saldo no ha cambiado.
+            Si no sabes el saldo nuevo, súmala${pillar === 't212' ? ' al saldo' : ' a'}: ${opts}
+            <button type="button" class="btn-xs" onclick="applyAportToInputs('${pillar}')">Sumar</button>
+            <div style="font-weight: 500;">Si no haces nada, se sumará sola al último saldo al guardar.</div>`;
+          return;
+        }
+        const market = delta - n.aport;
+        const pct = n.before > 0 ? (market / n.before) * 100 : null;
+        const pctTxt = pct === null ? '' : ` (${fmtPct(pct)})`;
+        el.innerHTML = `Saldo anterior ${fmtEur(n.before)} → ${fmtEur(n.after)} (${signed(delta)})` +
+          (Math.abs(n.aport) >= 0.005 ? ` · aportación ${fmtEur(n.aport)}` : '') +
+          ` · mercado: <span class="${market >= 0 ? 'ok' : 'text-danger'}">${signed(market)}${pctTxt}</span>`;
+        if (pct !== null && Math.abs(pct) > 20) {
+          el.className = 'flow-check warn';
+          el.innerHTML += '<div>Variación de mercado muy grande: revisa que saldos y aportación cuadren.</div>';
+        }
+      });
+    }
+
+    function applyAportToInputs(pillar) {
+      const state = recordFormState();
+      const n = pillarFormNumbers(pillar, state);
+      if (!n.aport) return;
+      const round2 = (x) => Math.round(x * 100) / 100;
+      if (pillar === 't212') {
+        document.getElementById('inputStockTotal').value = round2(n.before + n.aport);
+        updateRecordChecks();
+        return;
+      }
+      const sel = document.getElementById('dest-' + pillar);
+      const dest = sel ? sel.value : '__prop';
+      const cur = (a) => {
+        const el = document.getElementById('input_asset_' + a.id);
+        const raw = el ? el.value.trim() : '';
+        return raw === '' ? (parseFloat(state.assets[a.id]) || 0) : (parseFloat(raw) || 0);
+      };
+      const setVal = (a, v) => {
+        const el = document.getElementById('input_asset_' + a.id);
+        if (el) el.value = round2(v);
+      };
+      if (dest !== '__prop') {
+        const a = n.assets.find(x => x.id === dest);
+        if (a) setVal(a, cur(a) + n.aport);
+      } else {
+        const base = n.assets.reduce((s, a) => s + Math.max(0, cur(a)), 0);
+        if (base > 0) {
+          n.assets.forEach(a => setVal(a, cur(a) + n.aport * (Math.max(0, cur(a)) / base)));
+        } else {
+          const a = n.assets.slice().sort((x, y) => (Number(y.target) || 0) - (Number(x.target) || 0))[0];
+          if (a) setVal(a, cur(a) + n.aport);
+        }
+      }
+      updateRecordChecks();
+    }
+
     function saveRecord(e) {
       e.preventDefault();
       const editIndex = parseInt(document.getElementById('editIndex').value);
       
       // Valor vacío = no se toca: se arrastra el último valor conocido.
+      // Cuenta oculta con los chips = no se toca (ni saldos ni aportación).
+      const hiddenBlock = (pillar) => {
+        const block = document.getElementById('block-' + pillar);
+        return !!(block && block.classList.contains('hidden'));
+      };
       const assetInputs = document.querySelectorAll('.asset-val-input');
       const assetsMap = {};
       assetInputs.forEach(input => {
+        if (hiddenBlock(keyPillar(input.getAttribute('data-asset-id')))) return;
         const raw = (input.value || '').trim();
         if (raw === '') return;
         const v = parseFloat(raw);
         if (!isNaN(v)) assetsMap[input.getAttribute('data-asset-id')] = v;
       });
 
-      const fundsAport = parseFloat(document.getElementById('inputAport').value) || 0;
-      const cryptoAport = parseFloat(document.getElementById('inputCryptoAport').value) || 0;
-      const stockAport = parseFloat(document.getElementById('inputStockAport').value) || 0;
-      const stockTotalRaw = (document.getElementById('inputStockTotal').value || '').trim();
+      const fundsAport = hiddenBlock('myinvestor') ? 0 : (parseFloat(document.getElementById('inputAport').value) || 0);
+      const cryptoAport = hiddenBlock('crypto') ? 0 : (parseFloat(document.getElementById('inputCryptoAport').value) || 0);
+      const stockAport = hiddenBlock('t212') ? 0 : (parseFloat(document.getElementById('inputStockAport').value) || 0);
+      const stockTotalRaw = hiddenBlock('t212') ? '' : (document.getElementById('inputStockTotal').value || '').trim();
       const msciRaw = (document.getElementById('inputMsciNav').value || '').trim();
       const spRaw = (document.getElementById('inputSp500Nav').value || '').trim();
       const dateVal = document.getElementById('inputDate').value;
@@ -3922,7 +4391,7 @@
         records.push(newRecord);
       }
 
-      records.sort((a, b) => a.date.localeCompare(b.date));
+      sortRecords();
 
       saveData();
       renderAll();
@@ -4060,6 +4529,7 @@
           }
           loadSettings();
           normalizeConfig();
+          sortRecords();
           saveData();
           renderAll();
           alert("¡Copia de seguridad importada correctamente!");
@@ -4070,10 +4540,17 @@
       reader.readAsText(file);
     }
 
+    // Columnas ocultas de la tabla anual: se recuerdan y se reaplican al redibujar
+    // (antes, al recalcular, las filas nuevas volvían a mostrarse con la cabecera oculta).
+    const hiddenAnnualCols = new Set();
     function toggleTableCol(className, isVisible) {
-      const elements = document.querySelectorAll('#annualStatsTable .' + className);
-      elements.forEach(el => {
-        el.style.display = isVisible ? '' : 'none';
+      if (isVisible) hiddenAnnualCols.delete(className); else hiddenAnnualCols.add(className);
+      applyAnnualColumnVisibility();
+    }
+    function applyAnnualColumnVisibility() {
+      document.querySelectorAll('#annualStatsTable th, #annualStatsTable td').forEach(el => {
+        const hide = Array.from(el.classList).some(c => hiddenAnnualCols.has(c));
+        el.style.display = hide ? 'none' : '';
       });
     }
 
