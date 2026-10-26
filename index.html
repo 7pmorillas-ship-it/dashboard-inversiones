@@ -418,7 +418,9 @@
       width: 100%;
     }
     /* El dedo arrastra el gráfico; la página se desplaza fuera de él */
-    .chart-container canvas { touch-action: pan-y pinch-zoom; }
+    .chart-container canvas { touch-action: pan-y; cursor: grab; }
+    .chart-container canvas:active { cursor: grabbing; }
+    .chart-hint { margin: 6px 0 0; font-size: 11px; color: var(--text-muted); text-align: center; }
     @media (max-width: 640px) {
       .chart-container { height: 300px; }
       .chart-card { padding: 14px 10px; }
@@ -1142,6 +1144,7 @@
           <div class="chart-container">
             <canvas id="chartPatrimony"></canvas>
           </div>
+          <p class="chart-hint">Toca un punto para ver su valor · arrastra para moverte · rueda o pellizco para zoom · doble toque para volver</p>
         </div>
 
         <!-- Chart 2: Rentabilidad Acumulada -->
@@ -1163,6 +1166,7 @@
           <div class="chart-container">
             <canvas id="chartReturn"></canvas>
           </div>
+          <p class="chart-hint">Toca un punto para ver su valor · arrastra para moverte · rueda o pellizco para zoom · doble toque para volver</p>
         </div>
       </div>
     </div>
@@ -3545,6 +3549,99 @@
       };
     }
 
+    // ===== Guías al tocar un punto (en vez de tooltip) =====
+    // Líneas discontinuas del punto a los dos ejes, con el valor sobre el eje Y,
+    // la fecha sobre el eje X y una línea pequeña arriba con la serie.
+    function roundRectPath(ctx, x, y, w, h, r) {
+      ctx.beginPath();
+      ctx.moveTo(x + r, y);
+      ctx.arcTo(x + w, y, x + w, y + h, r);
+      ctx.arcTo(x + w, y + h, x, y + h, r);
+      ctx.arcTo(x, y + h, x, y, r);
+      ctx.arcTo(x, y, x + w, y, r);
+      ctx.closePath();
+    }
+    function drawPill(ctx, text, cx, cy, bg, align) {
+      ctx.font = `600 ${isNarrow() ? 10 : 11}px Outfit, sans-serif`;
+      const w = ctx.measureText(text).width + 10, h = isNarrow() ? 16 : 18;
+      let x = align === 'right' ? cx - w : (align === 'left' ? cx : cx - w / 2);
+      const y = cy - h / 2;
+      ctx.fillStyle = bg;
+      roundRectPath(ctx, x, y, w, h, 4);
+      ctx.fill();
+      ctx.fillStyle = '#fff';
+      ctx.textBaseline = 'middle';
+      ctx.textAlign = 'left';
+      ctx.fillText(text, x + 5, cy + 0.5);
+    }
+    const crosshairPlugin = {
+      id: 'crosshair',
+      afterDatasetsDraw(chart) {
+        // Opciones en crudo: Chart.js trataría las funciones de formato como "scriptable"
+        const raw0 = chart.config.options;
+        const opts = raw0 && raw0.plugins && raw0.plugins.crosshair;
+        if (!opts || !opts.enabled) return;
+        const act = chart.getActiveElements();
+        if (!act.length) return;
+        const a = act[0];
+        const ds = chart.data.datasets[a.datasetIndex];
+        const raw = ds.data[a.index];
+        const yVal = raw && typeof raw === 'object' ? raw.y : raw;
+        if (yVal === null || yVal === undefined) return;
+        const { ctx, chartArea: area, scales } = chart;
+        const px = a.element.x, py = a.element.y;
+        const color = typeof ds.borderColor === 'string' ? ds.borderColor : '#4f46e5';
+
+        ctx.save();
+        ctx.setLineDash([4, 4]);
+        ctx.lineWidth = 1;
+        ctx.strokeStyle = color;
+        ctx.globalAlpha = 0.8;
+        ctx.beginPath();
+        ctx.moveTo(px, py); ctx.lineTo(px, area.bottom);
+        ctx.moveTo(px, py); ctx.lineTo(area.left, py);
+        ctx.stroke();
+        ctx.setLineDash([]);
+        ctx.globalAlpha = 1;
+        ctx.beginPath();
+        ctx.arc(px, py, 4.5, 0, Math.PI * 2);
+        ctx.fillStyle = '#fff'; ctx.fill();
+        ctx.lineWidth = 2.5; ctx.strokeStyle = color; ctx.stroke();
+
+        // Valor sobre el eje Y y fecha sobre el eje X
+        // Dentro del área, pegado al eje (fuera se cortaba con cifras largas)
+        drawPill(ctx, opts.yFmt(yVal), area.left + 2, py, color, 'left');
+        const xText = opts.xFmt(a.index, raw);
+        ctx.font = `600 ${isNarrow() ? 10 : 11}px Outfit, sans-serif`;
+        const half = (ctx.measureText(xText).width + 10) / 2;
+        const cx = Math.min(Math.max(px, area.left + half), area.right - half);
+        drawPill(ctx, xText, cx, area.bottom + (scales.x ? 10 : 8), '#334155', 'center');
+
+        // Serie (y aportación, si la hay) en pequeño arriba a la izquierda
+        const extra = opts.extra ? opts.extra(a.index) : '';
+        ctx.font = `600 ${isNarrow() ? 10 : 11}px Outfit, sans-serif`;
+        ctx.fillStyle = color;
+        ctx.textAlign = 'left';
+        ctx.textBaseline = 'top';
+        ctx.fillText(ds.label + (extra ? '  ·  ' + extra : ''), area.left + 6, area.top + 4);
+        ctx.restore();
+      }
+    };
+    Chart.register(crosshairPlugin);
+
+    // Doble clic / doble toque: volver a la vista completa
+    function enableDoubleTapReset(chart) {
+      let lastTap = 0;
+      const reset = () => { chart.resetZoom(); chart.setActiveElements([]); chart.update('none'); };
+      chart.canvas.addEventListener('dblclick', reset);
+      chart.canvas.addEventListener('touchend', (e) => {
+        if (e.touches && e.touches.length) return;
+        const now = Date.now();
+        if (now - lastTap < 300) { reset(); e.preventDefault(); }
+        lastTap = now;
+      });
+    }
+
     function timeAxis(xs) {
       const min = xs.length ? xs[0] : 0;
       let max = xs.length ? xs[xs.length - 1] : 1;
@@ -3624,6 +3721,8 @@
         // moverse no pelea con el tooltip (como funcionaba antes).
         events: ['click', 'touchstart', 'mouseout'],
         interaction: { mode: 'nearest', intersect: false },
+        hover: { mode: 'nearest', intersect: false },
+        layout: { padding: { left: 4, right: 8, top: 4 } },
         onClick: (event, elements, chart) => {
           if (!elements || elements.length === 0) {
             chart.setActiveElements([]);
@@ -3633,14 +3732,17 @@
         },
         plugins: {
           legend: legendWithMemory(chartKey),
-          tooltip: compactTooltip({
-            title: (items) => items.length ? fmtDateDisplay(processed[items[0].dataIndex].date) : '',
-            label: (ctx) => ctx.parsed.y === null ? null : `${ctx.dataset.label}: ${labelFmt(ctx.parsed.y)}`,
-            footer: (items) => {
-              const f = tooltipAportFooter(processed)(items);
-              return Array.isArray(f) ? f[0] : f; // solo la línea corta
+          tooltip: { enabled: false },
+          crosshair: {
+            enabled: true,
+            yFmt: labelFmt,
+            xFmt: (i) => fmtDateDisplay(processed[i].date),
+            extra: (i) => {
+              const p = processed[i];
+              const t = p ? p.flows.funds + p.flows.crypto + p.flows.t212 : 0;
+              return Math.abs(t) >= 0.005 ? `${t > 0 ? '+' : ''}${fmtEur(t)} aportado` : '';
             }
-          }),
+          },
           zoom: {
             // Arrastre libre en los dos ejes (los límites anteriores impedían
             // moverse si no se había hecho zoom antes)
@@ -3706,6 +3808,7 @@
         },
         options: baseLineOptions(K1, xs, processed, (v) => fmtEurShort(v), (v) => fmtEur(v))
       });
+      enableDoubleTapReset(chartPatrimonyInstance);
 
       // Chart 2: Rentabilidad acumulada (%)
       // TWR: rentabilidad de la inversión sin el efecto de cuándo aportas (la que
@@ -3747,6 +3850,7 @@
         data: { datasets: retSets },
         options: baseLineOptions(K2, xs, processed, (v) => fmtPct(v), (v) => fmtPct(v))
       });
+      enableDoubleTapReset(chartReturnInstance);
 
       // Chart 3 & 4: Asset Donut & 3-Pillars Donut
       if (processed.length > 0) {
@@ -4532,10 +4636,16 @@
           interaction: { mode: 'nearest', intersect: false },
           plugins: {
             legend: { position: 'bottom', labels: { usePointStyle: true, pointStyle: 'line', font: { size: isNarrow() ? 10 : 12 } } },
-            tooltip: compactTooltip({
-              title: (items) => items.length ? xToDateLabel(items[0].parsed.x) : '',
-              label: (ctx) => `${ctx.dataset.label}: ${ctx.parsed.y.toFixed(1).replace('.', ',')}%`
-            })
+            tooltip: { enabled: false },
+            crosshair: {
+              enabled: true,
+              yFmt: (v) => v.toFixed(1).replace('.', ',') + '%',
+              xFmt: (i) => fmtDateDisplay(risk.labels[i])
+            },
+            zoom: {
+              pan: { enabled: true, mode: 'x', threshold: 0 },
+              zoom: { wheel: { enabled: true, speed: 0.08 }, pinch: { enabled: true }, mode: 'x' }
+            }
           },
           scales: {
             y: { ticks: { callback: v => v + '%' }, grid: { color: '#e2e8f0' } },
@@ -4543,6 +4653,7 @@
           }
         }
       });
+      enableDoubleTapReset(ddChart);
     }
 
     // Rentabilidad por año natural con TWR (la misma vara que la pestaña de riesgo
