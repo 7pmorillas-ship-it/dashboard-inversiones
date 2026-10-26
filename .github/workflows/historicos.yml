@@ -1,0 +1,55 @@
+name: Actualizar historicos
+
+# Cada lunes a las 06:00 UTC descarga de nuevo los precios (FT + tipo BCE)
+# y, si han cambiado, sube historicos.json. También se puede lanzar a mano.
+on:
+  schedule:
+    - cron: '0 6 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: historicos
+  cancel-in-progress: false
+
+jobs:
+  actualizar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: master
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Descargar precios
+        env:
+          PYTHONIOENCODING: utf-8
+        run: python scripts/actualizar_historicos.py
+
+      - name: Comprobar que el fichero es válido
+        run: |
+          python - <<'EOF'
+          import json
+          d = json.load(open('historicos.json', encoding='utf-8'))
+          n = len(d['series'])
+          assert n >= 10, f'solo {n} series: no se sobrescribe'
+          print('series:', n, 'generado:', d['generated'])
+          EOF
+
+      - name: Subir si ha cambiado
+        run: |
+          if git diff --quiet -- historicos.json; then
+            echo "Sin cambios"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add historicos.json
+          git commit -m "Historicos: precios actualizados ($(date -u +%Y-%m-%d))"
+          git push origin HEAD:master
