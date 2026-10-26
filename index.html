@@ -1068,6 +1068,10 @@
           <span class="badge" id="kpiAlphaBadge">vs MSCI World</span>
           <span class="text-muted" id="kpiAlphaSp500Val">vs S&P 500: +0.00%</span>
         </div>
+        <div class="kpi-sub" style="margin-top: 6px; flex-direction: column; align-items: flex-start; gap: 2px; font-size: 12px;">
+          <span id="kpiMoneyMsci" class="text-muted">—</span>
+          <span id="kpiMoneySp" class="text-muted">—</span>
+        </div>
       </div>
 
       <!-- Total Invertido -->
@@ -1282,7 +1286,8 @@
         </div>
         <p class="metric-note">
           <strong>TWR</strong> retorno encadenado, sin el efecto de tus aportaciones.
-          <strong>TIR</strong> rentabilidad real de tu dinero, ponderando cuándo entró cada euro.
+          <strong>TIR</strong> rentabilidad real de tu dinero, ponderando cuándo entró cada euro (con menos de un año de histórico se da la del periodo, sin anualizar: anualizar unas semanas da cifras sin sentido).
+          Volatilidad, Sharpe y beta necesitan al menos 8 registros con saldos reales y 3 meses de histórico (Sharpe, 6 meses); antes salen como "—" porque serían ruido.
           <strong>Volatilidad</strong> desviación anualizada de los retornos entre registros, escalada por los días reales de cada intervalo (los registros que solo son una aportación no cuentan).
           <strong>Sharpe</strong> retorno extra por unidad de riesgo (tasa libre de riesgo 2 %).
           <strong>Máx. caída</strong> el peor descenso desde un máximo.
@@ -2797,6 +2802,8 @@
     }
 
     const RISK_FREE_RATE = 0.02;
+    const MIN_RISK_INTERVALS = 8; // intervalos medidos mínimos para volatilidad y beta
+    const MIN_RISK_DAYS = 90;     // y al menos 3 meses de histórico: con menos es ruido
 
     function daysBetween(a, b) { return (new Date(b) - new Date(a)) / 86400000; }
 
@@ -2826,10 +2833,10 @@
       const t0 = new Date(cashflows[0].date).getTime();
       const years = (d) => (new Date(d).getTime() - t0) / (365.25 * 86400000);
       const npv = (rate) => cashflows.reduce((s, c) => s + c.amount / Math.pow(1 + rate, years(c.date)), 0);
-      let lo = -0.95, hi = 5.0;
+      let lo = -0.9999, hi = 1000;
       let flo = npv(lo), fhi = npv(hi);
       if (!isFinite(flo) || !isFinite(fhi) || flo * fhi > 0) return null;
-      for (let i = 0; i < 80; i++) {
+      for (let i = 0; i < 200; i++) {
         const mid = (lo + hi) / 2;
         const fm = npv(mid);
         if (flo * fm <= 0) { hi = mid; fhi = fm; } else { lo = mid; flo = fm; }
@@ -2887,7 +2894,9 @@
       const years = daysBetween(serie[0].date, serie[n - 1].date) / 365.25;
       const cagr = (years >= 0.5 && total > 0) ? Math.pow(total, 1 / years) - 1 : null;
 
-      const vol = annualVolatility(obs);
+      // Con pocos intervalos la volatilidad es ruido: se pide un mínimo
+      const enoughRisk = obs.length - 1 >= MIN_RISK_INTERVALS && daysBetween(obs[0].date, obs[obs.length - 1].date) >= MIN_RISK_DAYS;
+      const vol = enoughRisk ? annualVolatility(obs) : null;
       const sharpe = (cagr != null && vol > 0) ? (cagr - RISK_FREE_RATE) / vol : null;
 
       let peak = obs[0].value, maxDD = 0;
@@ -2897,13 +2906,22 @@
         if (dd < maxDD) maxDD = dd;
       });
 
+      // TIR: con menos de un año, anualizarla da cifras absurdas (un +3 % en
+      // mes y medio sale como +27 % anual). Se muestra la del periodo, sin anualizar.
+      const irr = xirr(cashflows);
+      let tir = irr, tirAnnual = true;
+      if (irr !== null && cashflows.length) {
+        const cfYears = daysBetween(cashflows[0].date, cashflows[cashflows.length - 1].date) / 365.25;
+        if (cfYears < 1) { tir = Math.pow(1 + irr, cfYears) - 1; tirAnnual = false; }
+      }
       return {
         ret: total - 1,
         cagr: cagr,
         vol: vol,
         sharpe: sharpe,
         maxDD: maxDD,
-        tir: xirr(cashflows)
+        tir: tir,
+        tirAnnual: tirAnnual
       };
     }
 
@@ -2919,7 +2937,7 @@
     function betaOf(serieA, serieB) {
       const a = intervalReturns(serieA), b = intervalReturns(serieB);
       const n = Math.min(a.length, b.length);
-      if (n < 3) return null;
+      if (n < MIN_RISK_INTERVALS || daysBetween(serieA[0].date, serieA[serieA.length - 1].date) < MIN_RISK_DAYS) return null;
       const ma = a.slice(0, n).reduce((x, y) => x + y, 0) / n;
       const mb = b.slice(0, n).reduce((x, y) => x + y, 0) / n;
       let cov = 0, varb = 0;
@@ -3016,7 +3034,7 @@
           { key: 'funds', name: 'MyInvestor', m: mFunds, series: sFunds, beta: beta(sFunds) },
           { key: 'crypto', name: 'Cripto', m: mCrypto, series: sCrypto, beta: beta(sCrypto) },
           { key: 't212', name: 'Trading 212', m: mStock, series: sStock, beta: beta(sStock) },
-          { key: 'msci', name: 'MSCI World', m: mMsci, series: sMsci, beta: sMsci.length ? 1 : null },
+          { key: 'msci', name: 'MSCI World', m: mMsci, series: sMsci, beta: beta(sMsci) !== null ? 1 : null },
           { key: 'sp500', name: 'S&P 500', m: mSp, series: sSp, beta: beta(sSp) }
         ],
         drawdown: {
@@ -3093,17 +3111,6 @@
 
       return records.map((r, index) => {
         const flows = recordFlows(r);
-        // Registros antiguos sin desglose: la aportación se reparte entre fondos
-        // y cripto según el peso que tenían en el registro anterior.
-        if (!r.flows && flows.funds > 0 && (lastFundsValue + lastCryptoValue) > 0) {
-          const base = lastFundsValue + lastCryptoValue;
-          const cryptoPart = Math.round(flows.funds * (lastCryptoValue / base) * 100) / 100;
-          flows.crypto = cryptoPart;
-          flows.funds = Math.round((flows.funds - cryptoPart) * 100) / 100;
-        }
-        const aportTotal = flows.funds + flows.crypto;
-        cumulativeInvested += aportTotal;
-        cumulativeInvestedCrypto += flows.crypto;
         const sAport = flows.t212;
         const hasStockTotal = (r.stockTotal !== undefined && r.stockTotal !== null && r.stockTotal !== '');
         let sTotal = hasStockTotal ? (parseFloat(r.stockTotal) || 0) : lastStockTotal;
@@ -3121,6 +3128,31 @@
             effectiveAssets[k] = v;
           });
         }
+
+        // Registros antiguos sin desglose: la aportación (fondos + cripto juntos) se
+        // reparte según cuánto ha crecido cada cuenta en este registro. Repartirla por
+        // el peso anterior daba 0 € a una cuenta que empezaba (cripto de 0 a 50 €) y
+        // le fabricaba rentabilidades enormes.
+        if (!r.flows && flows.funds > 0 && index > 0) {
+          let fundsNow = 0, cryptoNow = 0;
+          Object.keys(effectiveAssets).forEach(k => {
+            const v = parseFloat(effectiveAssets[k]) || 0;
+            if (keyPillar(k) === 'crypto') cryptoNow += v; else fundsNow += v;
+          });
+          const dF = Math.max(0, fundsNow - lastFundsValue);
+          const dC = Math.max(0, cryptoNow - lastCryptoValue);
+          let share = null;
+          if (dF + dC > 0) share = dC / (dF + dC);
+          else if (lastFundsValue + lastCryptoValue > 0) share = lastCryptoValue / (lastFundsValue + lastCryptoValue);
+          if (share !== null) {
+            const cryptoPart = Math.round(Math.min(flows.funds, flows.funds * share) * 100) / 100;
+            flows.crypto = cryptoPart;
+            flows.funds = Math.round((flows.funds - cryptoPart) * 100) / 100;
+          }
+        }
+        const aportTotal = flows.funds + flows.crypto;
+        cumulativeInvested += aportTotal;
+        cumulativeInvestedCrypto += flows.crypto;
 
         // Aportación sin saldos nuevos: si una cuenta recibe dinero pero ninguno de
         // sus saldos cambia, el dinero no puede haberse evaporado. Se suma al último
@@ -3445,6 +3477,20 @@
         }
       }
 
+      // 4b. Dinero: tu patrimonio frente a lo que tendrías con el mismo dinero,
+      // en las mismas fechas, metido todo en cada índice (desde el primer registro)
+      const moneyLine = (el, name, benchVal) => {
+        if (!el) return;
+        if (!(benchVal > 0) || !(last.totalWealth > 0)) { el.innerText = `vs ${name}: —`; el.className = 'text-muted'; return; }
+        const diffEur = last.totalWealth - benchVal;
+        const diffPct = (last.totalWealth / benchVal - 1) * 100;
+        el.innerHTML = `${diffEur >= 0 ? 'Ganas' : 'Pierdes'} <strong>${Math.abs(diffPct).toFixed(2).replace('.', ',')} %</strong> (${diffEur >= 0 ? '+' : '−'}${fmtEur(Math.abs(diffEur))}) vs ${name}`;
+        el.className = diffEur >= 0 ? 'text-success' : 'text-danger';
+        el.title = `Tu patrimonio ${fmtEur(last.totalWealth)} frente a ${fmtEur(benchVal)} si todo tu dinero hubiera ido a ${name} en las mismas fechas`;
+      };
+      moneyLine(document.getElementById('kpiMoneyMsci'), 'MSCI', last.msciAllVal);
+      moneyLine(document.getElementById('kpiMoneySp'), 'S&P 500', last.sp500AllVal);
+
       // 5. Total Invested in Period
       const periodAport = processed.reduce((sum, p) => sum + p.aport + (p.stockAport || 0), 0);
       const elInvestedVal = document.getElementById('kpiInvestedVal');
@@ -3544,7 +3590,17 @@
         maintainAspectRatio: false,
         animation: false,
         transitions: { zoom: { animation: { duration: 0 } } },
+        // Tooltip al hacer clic/tocar, no al pasar el ratón: así arrastrar para
+        // moverse no pelea con el tooltip (como funcionaba antes).
+        events: ['click', 'touchstart', 'mouseout'],
         interaction: { mode: 'index', intersect: false },
+        onClick: (event, elements, chart) => {
+          if (!elements || elements.length === 0) {
+            chart.setActiveElements([]);
+            if (chart.tooltip) chart.tooltip.setActiveElements([], { x: 0, y: 0 });
+            chart.update();
+          }
+        },
         plugins: {
           legend: legendWithMemory(chartKey),
           tooltip: {
@@ -3558,9 +3614,10 @@
             }
           },
           zoom: {
-            pan: { enabled: true, mode: 'x', threshold: 5 },
-            zoom: { wheel: { enabled: true, speed: 0.08 }, pinch: { enabled: true }, mode: 'x' },
-            limits: { x: { min: 'original', max: 'original' } }
+            // Arrastre libre en los dos ejes (los límites anteriores impedían
+            // moverse si no se había hecho zoom antes)
+            pan: { enabled: true, mode: 'xy', threshold: 0 },
+            zoom: { wheel: { enabled: true, speed: 0.08 }, pinch: { enabled: true }, mode: 'xy' }
           }
         },
         scales: {
@@ -4378,7 +4435,7 @@
       const rows = [
         ['Retorno total (TWR)', c => pct(c.m.ret)],
         ['Retorno anual (TWR)', c => pct(c.m.cagr)],
-        ['TIR de tu dinero', c => pct(c.m.tir)],
+        [(risk.columns[0].m.tirAnnual === false ? 'Rentab. de tu dinero (TIR, periodo)' : 'TIR anual de tu dinero'), c => pct(c.m.tir)],
         ['Volatilidad anual', c => pct(c.m.vol)],
         ['Sharpe', c => num(c.m.sharpe)],
         ['Máx. caída', c => pct(c.m.maxDD)],
