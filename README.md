@@ -73,3 +73,12 @@ El dashboard no depende de que la nube siga intacta:
 
 (El antiguo "Nivel 2", que nadie sin PIN pudiera escribir, queda resuelto con el token cifrado de GitHub.)
 
+
+## Histórico & Crisis (2026-10-26)
+
+Pestaña que aplica tu reparto de hoy (objetivos o saldos actuales, con rebalanceo mensual) a periodos pasados: COVID, subida de tipos de 2022, invasión de Ucrania, SVB, aranceles de 2025, deuda europea 2011, crisis de 2008 y cualquier año natural o rango.
+
+- Datos: `historicos.json`, cierre mensual real de cada ISIN publicado por Financial Times. Se regenera con `python scripts/actualizar_historicos.py`.
+- Lo que cotiza en USD (el ETC de oro) se pasa a EUR con el tipo oficial diario del BCE.
+- Nada se rellena: un fondo sin precio en el periodo queda fuera y la pestaña dice cuál y cuánto pesaba. La cripto y las acciones sueltas de T212 no tienen serie y se excluyen.
+- Única sustitución (desactivable): iShares Developed World (existe desde 08/2025) → Vanguard Global Stock Index EUR, que sigue el mismo índice MSCI World.

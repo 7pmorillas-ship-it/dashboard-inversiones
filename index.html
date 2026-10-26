@@ -420,6 +420,14 @@
     /* El dedo arrastra el gráfico; la página se desplaza fuera de él */
     .chart-container canvas { touch-action: pan-y; cursor: grab; }
     .chart-container canvas:active { cursor: grabbing; }
+    .hist-pills { padding: 4px 20px 10px; flex-wrap: wrap; }
+    .hist-pills select.pill-btn { appearance: auto; }
+    .hist-summary { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; padding: 0 20px 14px; }
+    .hist-summary > div { background: #f8fafc; border: 1px solid var(--border-color); border-radius: 10px; padding: 10px 12px; }
+    .hist-summary .k { display: block; font-size: 10.5px; text-transform: uppercase; letter-spacing: .06em; color: var(--text-muted); font-weight: 700; }
+    .hist-summary .v { display: block; font-size: 15px; font-weight: 700; margin: 2px 0; }
+    .hist-summary small { font-size: 11.5px; color: var(--text-muted); line-height: 1.45; }
+    .hist-h4 { font-size: 13px; margin: 18px 20px 8px; }
     .chart-hint { margin: 6px 0 0; font-size: 11px; color: var(--text-muted); text-align: center; }
     @media (max-width: 640px) {
       .chart-container { height: 300px; }
@@ -1111,6 +1119,9 @@
       <button class="tab-btn" onclick="switchTab('tab-risk', this)">
         <i class="fa-solid fa-gauge-high"></i> Riesgo & Comparativa
       </button>
+      <button class="tab-btn" onclick="switchTab('tab-crisis', this)">
+        <i class="fa-solid fa-clock-rotate-left"></i> Histórico & Crisis
+      </button>
       <button class="tab-btn" onclick="switchTab('tab-assets-config', this)">
         <i class="fa-solid fa-sliders"></i> Objetivos & Activos
       </button>
@@ -1134,7 +1145,7 @@
           <div class="chart-header">
             <div class="chart-title">
               <h3>Evolución Patrimonial (€)</h3>
-              <p>Patrimonio total (MyInvestor + Trading 212) frente a los índices simulados con <em>todo</em> tu dinero</p>
+              <p>Tu patrimonio frente al dinero que has metido (zona verde = lo que ganas, roja = lo que pierdes) y frente a los índices con ese mismo dinero. Los rombos grises marcan cada aportación.</p>
             </div>
             <div style="display: flex; gap: 8px; align-items: center;">
               <button class="btn btn-secondary" onclick="resetChartZoom('cardPatrimony')" title="Restablecer Zoom"><i class="fa-solid fa-rotate-left"></i> Restablecer</button>
@@ -1319,6 +1330,33 @@
         <div class="chart-container" style="height: 300px;">
           <canvas id="chartDrawdown"></canvas>
         </div>
+      </div>
+    </div>
+
+    <!-- Tab: Histórico & Crisis -->
+    <div id="tab-crisis" class="tab-content">
+      <div class="table-card">
+        <div class="chart-header">
+          <div class="chart-title">
+            <h3>Cómo se habría comportado tu cartera</h3>
+            <p>Tu reparto de hoy con los precios reales de cada fondo en crisis y años pasados, frente a otros activos</p>
+          </div>
+          <div class="filter-pills" id="histWeightsToggle" style="margin: 0;">
+            <button class="pill-btn" data-w="target" onclick="setHistoryWeights('target')">Con mis objetivos</button>
+            <button class="pill-btn" data-w="current" onclick="setHistoryWeights('current')">Con mis saldos actuales</button>
+          </div>
+        </div>
+        <div class="filter-pills hist-pills" id="histPeriodPills"></div>
+        <div class="date-range-group" style="padding: 0 20px 12px;">
+          <label for="histFrom">Desde:</label><input type="month" id="histFrom">
+          <label for="histTo">Hasta:</label><input type="month" id="histTo">
+          <button class="btn-xs" onclick="applyHistoryCustom()">Ver</button>
+        </div>
+        <div class="chart-container" style="height: 320px; padding: 0 12px;">
+          <canvas id="chartHistory"></canvas>
+        </div>
+        <p class="chart-hint">Rentabilidad acumulada desde el inicio del periodo · toca un punto · arrastra · doble toque para volver</p>
+        <div id="historyContent" style="margin-top: 14px;"><div class="empty-state">Cargando precios históricos…</div></div>
       </div>
     </div>
 
@@ -3795,8 +3833,10 @@
                 fill: { target: 1, above: 'rgba(16, 185, 129, .10)', below: 'rgba(239, 68, 68, .12)' }
               }
             }),
-            lineDataset(K1, 'invested', 'Total aportado', pts(p => p.cumulativeInvestedAll), SERIES_COLORS.invested, {
-              ds: { borderDash: [5, 4], stepped: true, pointRadius: aportPointRadius }
+            // Mismo trazado que el patrimonio (recto entre registros): si fuera en
+            // escalón, entre dos registros parecía que había una ganancia que no existe.
+            lineDataset(K1, 'invested', 'Dinero aportado (acumulado)', pts(p => p.cumulativeInvestedAll), SERIES_COLORS.invested, {
+              ds: { borderDash: [5, 4], borderWidth: 1.8, pointRadius: aportPointRadius, pointStyle: 'rectRot' }
             }),
             lineDataset(K1, 'msci', 'MSCI World (mismo dinero)', pts(p => p.msciAllVal), SERIES_COLORS.msci, { ds: { borderDash: [6, 4] } }),
             lineDataset(K1, 'sp500', 'S&P 500 (mismo dinero)', pts(p => p.sp500AllVal), SERIES_COLORS.sp500, { ds: { borderDash: [6, 4] } }),
@@ -4724,6 +4764,291 @@
       applyAnnualColumnVisibility();
     }
 
+    // ================= HISTÓRICO: tu cartera en crisis pasadas =================
+    // Precios reales de cada fondo (Financial Times, cierre mensual) guardados en
+    // historicos.json por scripts/actualizar_historicos.py. Nada se inventa: un
+    // fondo que no existía en el periodo queda fuera y se dice cuál y cuánto pesaba.
+    const HISTORY_PERIODS = [
+      { id: 'covid', name: 'Crash COVID-19', from: '2020-01', to: '2020-12',
+        note: 'Máximo del mercado el 19/02/2020 y suelo el 23/03/2020. Con datos mensuales la caída intramensual se ve algo suavizada.' },
+      { id: 'tipos', name: 'Inflación y subida de tipos (2022)', from: '2021-12', to: '2022-12',
+        note: 'La Fed empezó a subir tipos en marzo de 2022 y el BCE en julio de 2022. Año malo a la vez para bolsa y bonos.' },
+      { id: 'ucrania', name: 'Invasión de Ucrania', from: '2022-01', to: '2022-09',
+        note: 'Rusia invadió Ucrania el 24/02/2022: subidas de energía y materias primas.' },
+      { id: 'svb', name: 'Crisis bancaria EE. UU. (SVB)', from: '2023-02', to: '2023-05',
+        note: 'Quiebra de Silicon Valley Bank el 10/03/2023 y rescate de Credit Suisse.' },
+      { id: 'aranceles', name: 'Aranceles de EE. UU. (abril 2025)', from: '2025-01', to: '2025-06',
+        note: 'Anuncio de aranceles generalizados el 02/04/2025 y fuerte caída de las bolsas en los días siguientes.' },
+      { id: 'deuda', name: 'Crisis de deuda europea (2011)', from: '2011-04', to: '2011-12',
+        note: 'Tensiones con la deuda de Grecia, Italia y España y rebaja de la nota de EE. UU. (agosto de 2011).' },
+      { id: 'gfc', name: 'Crisis financiera (2008)', from: '2007-10', to: '2009-03',
+        note: 'De los máximos de octubre de 2007 a los mínimos de marzo de 2009 (quiebra de Lehman, 15/09/2008).' }
+    ];
+    const HISTORY_COLORS = {
+      portfolio: '#4f46e5', bm_msci_world: '#f59e0b', bm_sp500: '#f43f5e', bm_emerg: '#10b981',
+      bm_bonds: '#0ea5e9', bm_gold: '#78350f', bm_cash: '#94a3b8'
+    };
+    let historyData = null;
+    let historyLoading = null;
+    let historyChart = null;
+    let historyState = { period: 'covid', from: '', to: '', weights: 'target', equiv: true };
+    // Fondo nuevo -> fondo real más antiguo que replica el MISMO índice (solo estos casos)
+    const HISTORY_EQUIVALENTS = {
+      ishares_dev: { id: 'bm_msci_world', why: 'mismo índice (MSCI World), fondo Vanguard Global Stock Index EUR' }
+    };
+    function toggleHistoryEquiv() { historyState.equiv = !historyState.equiv; renderHistoryTab(); }
+
+    function loadHistoryData() {
+      if (historyData) return Promise.resolve(historyData);
+      if (!historyLoading) {
+        historyLoading = fetch('historicos.json?t=' + Math.floor(Date.now() / 3600000), { cache: 'no-store' })
+          .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+          .then(d => {
+            // índice mes -> precio para cada serie
+            Object.values(d.series).forEach(s => {
+              s.byMonth = {};
+              s.monthly.forEach(([date, px]) => { s.byMonth[date.slice(0, 7)] = { date, px }; });
+            });
+            historyData = d;
+            return d;
+          })
+          .catch(e => { historyLoading = null; throw e; });
+      }
+      return historyLoading;
+    }
+
+    function monthRange(from, to) {
+      const out = [];
+      let [y, m] = from.split('-').map(Number);
+      const [ty, tm] = to.split('-').map(Number);
+      while (y < ty || (y === ty && m <= tm)) {
+        out.push(`${y}-${String(m).padStart(2, '0')}`);
+        m++; if (m > 12) { m = 1; y++; }
+      }
+      return out;
+    }
+
+    // Serie base 100 de un activo; null si le falta algún mes del periodo.
+    function historyIndex(serie, months) {
+      if (!serie) return null;
+      const out = [];
+      for (const mk of months) {
+        const p = serie.byMonth[mk];
+        if (!p) return null;
+        out.push(p.px);
+      }
+      return out.map(px => (px / out[0]) * 100);
+    }
+
+    function historyStats(idx, months) {
+      if (!idx || idx.length < 2) return null;
+      const rets = [];
+      for (let i = 1; i < idx.length; i++) rets.push(idx[i] / idx[i - 1] - 1);
+      let peak = idx[0], maxDD = 0;
+      idx.forEach(v => { if (v > peak) peak = v; maxDD = Math.min(maxDD, v / peak - 1); });
+      const total = idx[idx.length - 1] / idx[0] - 1;
+      const nMonths = idx.length - 1;
+      const mean = rets.reduce((a, b) => a + b, 0) / rets.length;
+      const vol = rets.length >= 6
+        ? Math.sqrt(rets.reduce((a, b) => a + (b - mean) * (b - mean), 0) / (rets.length - 1)) * Math.sqrt(12)
+        : null;
+      return {
+        total,
+        annual: nMonths >= 12 ? Math.pow(1 + total, 12 / nMonths) - 1 : null,
+        maxDD,
+        worst: Math.min(...rets),
+        worstMonth: months[rets.indexOf(Math.min(...rets)) + 1],
+        vol
+      };
+    }
+
+    // Pesos de la cartera: objetivos o reparto real del último registro.
+    function historyWeights() {
+      const w = {};
+      if (historyState.weights === 'current') {
+        const st = effectiveStateAt(null);
+        assetsConfig.forEach(a => { w[a.id] = Math.max(0, parseFloat(st.assets[a.id]) || 0); });
+        w.__t212 = Math.max(0, st.stockTotal || 0);
+      } else {
+        assetsConfig.forEach(a => { w[a.id] = Math.max(0, Number(a.target) || 0); });
+        w.__t212 = Math.max(0, Number(appSettings.stockTarget) || 0);
+      }
+      const sum = Object.values(w).reduce((a, b) => a + b, 0) || 1;
+      Object.keys(w).forEach(k => { w[k] = w[k] / sum; });
+      return w;
+    }
+
+    function setHistoryPeriod(id) {
+      historyState.period = id;
+      if (id !== 'custom') { historyState.from = ''; historyState.to = ''; }
+      renderHistoryTab();
+    }
+    function setHistoryWeights(mode) {
+      historyState.weights = mode;
+      renderHistoryTab();
+    }
+    function applyHistoryCustom() {
+      const f = document.getElementById('histFrom').value, t = document.getElementById('histTo').value;
+      if (!f || !t || f >= t) { alert('Elige un mes de inicio anterior al de fin.'); return; }
+      historyState = Object.assign(historyState, { period: 'custom', from: f, to: t });
+      renderHistoryTab();
+    }
+
+    function historyPeriodDef() {
+      if (historyState.period === 'custom') {
+        return { id: 'custom', name: 'Periodo personalizado', from: historyState.from, to: historyState.to, note: '' };
+      }
+      if (/^y\d{4}$/.test(historyState.period)) {
+        const y = Number(historyState.period.slice(1));
+        return { id: historyState.period, name: 'Año ' + y, from: `${y - 1}-12`, to: `${y}-12`, note: 'Del cierre de diciembre del año anterior al cierre de diciembre.' };
+      }
+      return HISTORY_PERIODS.find(p => p.id === historyState.period) || HISTORY_PERIODS[0];
+    }
+
+    async function renderHistoryTab() {
+      const box = document.getElementById('historyContent');
+      if (!box) return;
+      let data;
+      try {
+        data = await loadHistoryData();
+      } catch (e) {
+        box.innerHTML = `<div class="empty-state"><i class="fa-solid fa-triangle-exclamation"></i>No se pudieron cargar los datos históricos (${e.message}).</div>`;
+        return;
+      }
+
+      // Botones de periodos (crisis + años naturales con datos)
+      const allMonths = Object.values(data.series).flatMap(s => Object.keys(s.byMonth)).sort();
+      const lastMk = allMonths[allMonths.length - 1];
+      const firstYear = Number(allMonths[0].slice(0, 4)) + 1;
+      const lastYear = Number(lastMk.slice(0, 4));
+      const pills = document.getElementById('histPeriodPills');
+      if (pills && !pills.dataset.ready) {
+        let htmlP = HISTORY_PERIODS.map(p => `<button class="pill-btn" data-hp="${p.id}" onclick="setHistoryPeriod('${p.id}')">${p.name}</button>`).join('');
+        const years = [];
+        for (let y = lastYear; y >= firstYear; y--) years.push(y);
+        htmlP += `<select class="pill-btn" id="histYearSel" onchange="if(this.value) setHistoryPeriod(this.value)">
+            <option value="">Año natural…</option>${years.map(y => `<option value="y${y}">${y}${y === lastYear ? ' (hasta hoy)' : ''}</option>`).join('')}
+          </select>`;
+        pills.innerHTML = htmlP;
+        pills.dataset.ready = '1';
+        const f = document.getElementById('histFrom'), t = document.getElementById('histTo');
+        if (f) { f.min = allMonths[0]; f.max = lastMk; }
+        if (t) { t.min = allMonths[0]; t.max = lastMk; }
+      }
+      document.querySelectorAll('#histPeriodPills [data-hp]').forEach(b => b.classList.toggle('active', b.getAttribute('data-hp') === historyState.period));
+      document.querySelectorAll('#histWeightsToggle .pill-btn').forEach(b => b.classList.toggle('active', b.getAttribute('data-w') === historyState.weights));
+
+      const per = historyPeriodDef();
+      const to = per.to > lastMk ? lastMk : per.to;
+      const months = monthRange(per.from, to);
+
+      // --- Cartera: activos con datos en todo el periodo, pesos re-normalizados ---
+      const weights = historyWeights();
+      const nameOf = (id) => id === '__t212' ? 'Trading 212 (acciones sueltas)' : ((assetsConfig.find(a => a.id === id) || {}).name || id);
+      const included = [], excluded = [];
+      Object.keys(weights).forEach(id => {
+        if (weights[id] <= 0) return;
+        const serie = id === '__t212' ? null : data.series[id];
+        const idx = historyIndex(serie, months);
+        const eq = HISTORY_EQUIVALENTS[id];
+        const eqIdx = !idx && eq && historyState.equiv ? historyIndex(data.series[eq.id], months) : null;
+        if (idx) included.push({ id, w: weights[id], idx, serie });
+        else if (eqIdx) included.push({ id, w: weights[id], idx: eqIdx, serie: data.series[eq.id], equiv: eq.why, ownFirst: serie && serie.first });
+        else excluded.push({
+          id, w: weights[id],
+          why: id === '__t212' ? 'acciones sueltas: no hay un precio único'
+            : (!serie ? (keyPillar(id) === 'crypto' ? 'cripto: sin fuente fiable en FT' : 'sin datos en FT')
+              : `existe desde ${fmtDateDisplay(serie.first)}`)
+        });
+      });
+      const covered = included.reduce((s, x) => s + x.w, 0);
+
+      let portIdx = null;
+      if (included.length && months.length >= 2) {
+        portIdx = [100];
+        for (let i = 1; i < months.length; i++) {
+          // Rebalanceo mensual a los pesos: retorno = suma ponderada de retornos
+          const r = included.reduce((s, x) => s + (x.w / covered) * (x.idx[i] / x.idx[i - 1] - 1), 0);
+          portIdx.push(portIdx[i - 1] * (1 + r));
+        }
+      }
+
+      const benches = Object.entries(data.series).filter(([, s]) => s.bench);
+      const lines = [];
+      if (portIdx) lines.push({ id: 'portfolio', name: 'Tu cartera (simulada)', idx: portIdx });
+      benches.forEach(([id, s]) => {
+        const idx = historyIndex(s, months);
+        lines.push({ id, name: s.name, idx, first: s.first });
+      });
+
+      // --- Gráfico ---
+      const xsSafe = months.map(mk => dateToX(mk + '-15'));
+      const canvas = document.getElementById('chartHistory');
+      if (historyChart) { historyChart.destroy(); historyChart = null; }
+      if (canvas) {
+        historyChart = new Chart(canvas, {
+          type: 'line',
+          data: {
+            datasets: lines.filter(l => l.idx).map(l => lineDataset('history', l.id, l.name,
+              l.idx.map((v, i) => ({ x: xsSafe[i], y: v - 100 })), HISTORY_COLORS[l.id] || '#64748b',
+              { ds: l.id === 'portfolio' ? { borderWidth: 3.2, pointRadius: months.length <= 24 ? 2.5 : 0 } : { borderDash: [5, 4], borderWidth: 1.6 } }))
+          },
+          options: (() => {
+            const o = baseLineOptions('history', xsSafe, months.map(mk => ({ date: mk + '-01', flows: { funds: 0, crypto: 0, t212: 0 } })), (v) => fmtPct(v), (v) => fmtPct(v));
+            o.plugins.crosshair.xFmt = (i) => { const [y, m] = months[i].split('-'); return `${m}/${y}`; };
+            o.plugins.crosshair.extra = null;
+            o.scales.x.ticks.callback = (v) => { const d = new Date(v); return `${String(d.getUTCMonth() + 1).padStart(2, '0')}/${String(d.getUTCFullYear()).slice(2)}`; };
+            return o;
+          })()
+        });
+        enableDoubleTapReset(historyChart);
+      }
+
+      // --- Tabla ---
+      const pct = (v) => v === null || v === undefined ? '<span class="text-muted">—</span>' : `<span class="${v >= 0 ? 'text-success' : 'text-danger'}">${(v >= 0 ? '+' : '') + (v * 100).toFixed(1).replace('.', ',')} %</span>`;
+      const plain = (v) => v === null || v === undefined ? '<span class="text-muted">—</span>' : (v * 100).toFixed(1).replace('.', ',') + ' %';
+      const monthLabel = (mk) => { if (!mk) return ''; const [y, m] = mk.split('-'); return `${m}/${y}`; };
+      const statsRows = lines.map(l => {
+        const st = historyStats(l.idx, months);
+        if (!st) {
+          return `<tr><td>${l.name}</td><td colspan="5" class="text-muted">sin datos en este periodo${l.first ? ' (existe desde ' + fmtDateDisplay(l.first) + ')' : ''}</td></tr>`;
+        }
+        const strong = l.id === 'portfolio' ? ' style="font-weight:700;"' : '';
+        return `<tr${strong}><td>${l.name}</td><td>${pct(st.total)}</td><td>${pct(st.annual)}</td><td>${pct(st.maxDD)}</td>
+          <td>${pct(st.worst)} <span class="text-muted" style="font-size:.75rem;">${monthLabel(st.worstMonth)}</span></td><td>${plain(st.vol)}</td></tr>`;
+      }).join('');
+
+      const fundRows = included.sort((a, b) => b.w - a.w).map(x => {
+        const st = historyStats(x.idx, months);
+        const label = nameOf(x.id) + (x.equiv ? `<div class="text-muted" style="font-size:.72rem;">sustituido por su equivalente: ${x.equiv}${x.ownFirst ? ' (el tuyo existe desde ' + fmtDateDisplay(x.ownFirst) + ')' : ''}</div>` : '');
+        return `<tr><td>${label}</td><td>${(x.w / covered * 100).toFixed(1).replace('.', ',')} %</td><td>${pct(st.total)}</td><td>${pct(st.maxDD)}</td><td class="text-muted" style="font-size:.75rem;">${x.serie.ftSymbol}</td></tr>`;
+      }).join('');
+      const exclRows = excluded.map(x => `<li><strong>${nameOf(x.id)}</strong> (${(x.w * 100).toFixed(1).replace('.', ',')} % de tu cartera): ${x.why}</li>`).join('');
+
+      const startLbl = monthLabel(months[0]), endLbl = monthLabel(months[months.length - 1]);
+      box.innerHTML = `
+        <div class="hist-summary">
+          <div><span class="k">Periodo</span><span class="v">${per.name}</span><small>cierre ${startLbl} → cierre ${endLbl}${per.note ? ' · ' + per.note : ''}</small></div>
+          <div><span class="k">Fondos nuevos</span><span class="v"><button class="pill-btn ${historyState.equiv ? 'active' : ''}" onclick="toggleHistoryEquiv()">${historyState.equiv ? 'Usando equivalentes' : 'Sin equivalentes'}</button></span><small>${historyState.equiv ? 'Si un fondo tuyo no existía, se usa otro real que sigue el mismo índice (se indica abajo). Pulsa para quitarlo.' : 'Solo tus fondos exactos; los que no existían quedan fuera.'}</small></div>
+          <div><span class="k">Cartera con datos</span><span class="v ${covered < 0.8 ? 'text-danger' : ''}">${(covered * 100).toFixed(0)} %</span><small>${covered < 0.999 ? 'el resto no existía o no tiene precio: se reparte su peso entre lo que sí' : 'todos tus activos tienen precio en el periodo'}</small></div>
+        </div>
+        ${!portIdx ? '<div class="empty-state">Ninguno de tus activos tiene precios en todo este periodo.</div>' : ''}
+        <div class="table-wrapper"><table class="risk-table">
+          <thead><tr><th>Activo</th><th>Rentab. periodo</th><th>Anualizada</th><th>Máx. caída</th><th>Peor mes</th><th>Volatilidad</th></tr></thead>
+          <tbody>${statsRows}</tbody></table></div>
+        ${fundRows ? `<h4 class="hist-h4">Qué ha hecho cada fondo de tu cartera</h4>
+        <div class="table-wrapper"><table class="risk-table">
+          <thead><tr><th>Fondo</th><th>Peso usado</th><th>Rentab. periodo</th><th>Máx. caída</th><th>Fuente (FT)</th></tr></thead>
+          <tbody>${fundRows}</tbody></table></div>` : ''}
+        ${exclRows ? `<p class="metric-note" style="margin: 12px 20px 0;"><strong>Fuera del cálculo:</strong></p><ul class="metric-note" style="margin: 4px 20px 0 36px;">${exclRows}</ul>` : ''}
+        <p class="metric-note" style="margin: 12px 20px 18px;">
+          <strong>Cómo se calcula.</strong> Precios reales de cada fondo publicados por ${data.source} (descargados el ${fmtDateDisplay(data.generated)}): cierre del último día con dato de cada mes, en la divisa de cada fondo.
+          "Tu cartera" es tu reparto de hoy (${historyState.weights === 'target' ? 'tus objetivos' : 'tus saldos actuales'}) aplicado en ese periodo, con rebalanceo mensual: es lo que habría hecho, no lo que ganaste tú.
+          Las comparativas son fondos indexados reales, no índices teóricos. No hay datos inventados ni rellenados: si un fondo no existía, queda fuera y se indica arriba.
+          Con datos mensuales, las caídas que duraron días (como la del COVID) se ven algo menores que en los cierres diarios.
+        </p>`;
+    }
+
     // Tabs Switcher
     function switchTab(tabId, btn) {
       document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
@@ -4736,6 +5061,7 @@
       if (tabId === 'tab-risk' && ddChart) {
         setTimeout(() => ddChart.resize(), 30);
       }
+      if (tabId === 'tab-crisis') renderHistoryTab();
     }
 
     // Modal Operations (Record Date)

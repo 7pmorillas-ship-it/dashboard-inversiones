@@ -3,6 +3,8 @@
 *.xls
 *.csv
 *.json
+# Precios públicos de mercado (Financial Times), sin datos personales
+!historicos.json
 backup*/
 _archivo/
 
