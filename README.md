@@ -5,17 +5,26 @@ Dashboard personal en un único `index.html` autocontenido: cartera MyInvestor +
 ## Modelo de privacidad (importante)
 
 - **El código no lleva cifras.** `DEFAULT_RECORDS` se neutralizó: antes tenía saldos reales incrustados y por eso no se podía publicar la página.
-- **Los datos viajan cifrados.** El JSON remoto (`https://api.npoint.io/00c7f3df788f252ae701`) guarda solo un envoltorio:
+- **Los datos viajan cifrados.** Desde 2026-10-26 viven en la rama `datos` de este repositorio, fichero `cartera.enc.json`, que solo guarda un envoltorio:
 
   ```json
   { "v": 2, "kdf": "PBKDF2-SHA256", "iter": 250000, "salt": "...", "iv": "...", "ct": "..." }
   ```
 
   Algoritmo: AES-256-GCM, clave derivada del PIN con PBKDF2-SHA256 (250.000 iteraciones). La clave vive **solo en memoria**; el PIN nunca se envía ni se guarda en disco (como mucho en `sessionStorage` si marcas "recordar mientras el navegador esté abierto").
-- Sin el PIN correcto no se puede leer nada, aunque alguien abra la URL o descargue el JSON.
+- Sin el PIN correcto no se puede leer nada, aunque el fichero sea público.
+- **Escribir exige un token de GitHub** (fine-grained, solo `dashboard-inversiones`, permiso *Contents: Read and write*). Se pega una vez en "Nube GitHub" y viaja **dentro** del payload cifrado (`cloud.token`), así que los demás dispositivos lo obtienen al poner el PIN. Nadie sin PIN puede escribir.
 - **El PIN es irrecuperable.** Si se pierde, los datos cifrados no se pueden descifrar. Guarda una copia en claro fuera de git.
 
-⚠️ El endpoint de npoint es público y **acepta escrituras sin autenticación**: quien tenga la URL e inserte un JSON válido puede reemplazar el contenido (cifrado, así que no leería nada, pero sí podría borrarte los datos). Por eso conviene tener la copia de seguridad local.
+Antes los datos estaban en npoint (`https://api.npoint.io/00c7f3df788f252ae701`): algunas redes de empresa lo bloquean y aceptaba escrituras de cualquiera. Ahora solo se lee para migrar: si la rama `datos` está vacía, la web prueba npoint y luego la copia local del navegador.
+
+## Sincronización entre dispositivos
+
+- Cada cambio se guarda al momento en el navegador y, agrupado, en la nube (sin pulsar nada).
+- La web comprueba la nube cada minuto y al volver a la pestaña (no mientras hay una ventana de edición abierta).
+- Fusión a 3 bandas (último estado sincronizado, local y remoto) por `id` de registro y de activo: los cambios de dos dispositivos se juntan. Si los dos tocan lo mismo, gana el que guarda; si uno borra y otro edita, se conserva. Los registros antiguos reciben un id determinista (`rAAAAMMDD_n`) para que coincidan entre dispositivos.
+- Escritura con el `sha` del fichero (control de concurrencia de GitHub): si otro dispositivo guardó en medio, se vuelve a leer, se fusiona y se reintenta.
+- Sin conexión, los cambios quedan marcados (`inv_cloud_dirty_v1`) y se suben solos al volver la red.
 
 ## Uso
 
@@ -55,12 +64,12 @@ Si el JSON remoto todavía no tiene `v: 2`, la página detecta el formato antigu
 
 ## Copias de seguridad (Nivel 1)
 
-El dashboard no depende de que el npoint siga intacto:
+El dashboard no depende de que la nube siga intacta:
 
 - Cada vez que se descarga o se guarda el envoltorio cifrado, se guarda también en el navegador (`inv_cloud_last` y hasta 20 versiones en `inv_cloud_history_v1`).
 - Botón **⬇ Copia**: descarga el JSON cifrado a disco (`cartera-cifrada-AAAA-MM-DD.json`).
-- Botón **⬆ Restaurar**: sube una copia cifrada al npoint y la deja lista para abrir con el PIN.
+- Botón **⬆ Restaurar**: abre una copia cifrada con el PIN actual y la convierte en los datos actuales (se sube a la nube).
 - Si la nube no responde o la han vaciado, la web ofrece abrir la **última copia local** pidiendo el PIN.
 
-Pendiente (Nivel 2): endpoint propio en la VM que acepte escrituras firmadas con una clave derivada del PIN, para que nadie sin PIN pueda escribir en la nube.
+(El antiguo "Nivel 2", que nadie sin PIN pudiera escribir, queda resuelto con el token cifrado de GitHub.)
 

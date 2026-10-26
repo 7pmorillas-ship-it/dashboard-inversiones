@@ -964,7 +964,10 @@
           <i class="fa-solid fa-cloud"></i> Nube: ACTIVA
         </button>
         <button class="btn btn-cloud" style="background: #0ea5e9;" onclick="forceSyncCloud()">
-          <i class="fa-solid fa-rotate"></i> Forzar Recarga
+          <i class="fa-solid fa-rotate"></i> Sincronizar
+        </button>
+        <button class="btn btn-secondary" onclick="openCloudModal()" title="Conectar la nube (GitHub)">
+          <i class="fa-brands fa-github"></i> Nube GitHub
         </button>
         <button class="btn btn-secondary" onclick="openPinModal()">
           <i class="fa-solid fa-lock"></i> Seguridad PIN
@@ -981,7 +984,7 @@
         <button class="btn btn-secondary" onclick="triggerImport()">
           <i class="fa-solid fa-upload"></i> Cargar Backup
         </button>
-        <input type="file" id="importFile" accept=".json" style="display:none;" onchange="importJSON(event)">
+        <input type="file" id="importFile" accept=".json,application/json" style="display:none;" onchange="importJSON(event)">
       </div>
     </header>
 
@@ -1459,8 +1462,11 @@
         <h3><i class="fa-solid fa-cloud"></i> 1. Sincronización Automática en la Nube</h3>
         <p>Tus datos se guardan y sincronizan automáticamente entre tu móvil y ordenador de forma transparente:</p>
         <ul>
-          <li>La opción <strong>☁️ Nube: ACTIVA</strong> en la parte superior indica que la sincronización está habilitada.</li>
-          <li>Cada vez que añades un registro o modificas tus fondos, los cambios se guardan instantáneamente en la base de datos y estarán disponibles al abrir la web en otro dispositivo.</li>
+          <li>Los datos viven <strong>cifrados con tu PIN</strong> en la rama <code>datos</code> de este repositorio de GitHub. Sin el PIN nadie puede leerlos, y sin tu token nadie puede escribirlos.</li>
+          <li>La primera vez, en <strong>Nube GitHub</strong> pegas un token (una sola vez). Viaja cifrado con tus datos: en el móvil u otro ordenador solo tendrás que poner el PIN.</li>
+          <li>Cada cambio (un registro, una aportación, un objetivo) se guarda solo, sin pulsar nada. Los demás dispositivos lo ven en menos de un minuto o al volver a la pestaña.</li>
+          <li>Si dos dispositivos cambian cosas a la vez, se juntan: cada registro tiene su propio identificador, así que no se pisan.</li>
+          <li>Sin conexión, los cambios se quedan en el navegador y se suben solos cuando vuelve la red.</li>
         </ul>
       </div>
 
@@ -1611,6 +1617,42 @@
         <div class="modal-footer">
           <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancelar</button>
           <button type="submit" class="btn btn-primary"><i class="fa-solid fa-save"></i> Guardar Registro</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal: conectar la nube (GitHub) -->
+  <div class="modal-overlay" id="modalCloud">
+    <div class="modal-card" style="max-width: 560px;">
+      <div class="modal-header">
+        <h3><i class="fa-brands fa-github"></i> Nube en GitHub</h3>
+        <button class="close-btn" onclick="closeCloudModal()">&times;</button>
+      </div>
+      <form onsubmit="saveCloudToken(event)">
+        <div class="modal-body">
+          <p class="metric-note" id="cloudModalStatus" style="margin: 0 0 14px; font-size: 13px;"></p>
+          <p class="metric-note" style="margin: 0 0 10px; font-size: 13px;">
+            Tus datos se guardan <strong>cifrados con tu PIN</strong> en este mismo repositorio (rama <code>datos</code>).
+            Para poder escribir hace falta un token de GitHub. Solo se pone <strong>una vez</strong>: viaja cifrado con tus datos,
+            así que en el móvil o en otro ordenador bastará con el PIN.
+          </p>
+          <ol class="metric-note" style="margin: 0 0 14px 18px; font-size: 13px; line-height: 1.7;">
+            <li>Abre <a href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener">GitHub → nuevo token (fine-grained)</a>.</li>
+            <li>Nombre: <code>dashboard-inversiones</code>. Caducidad: la más larga que te deje.</li>
+            <li><em>Repository access</em> → <strong>Only select repositories</strong> → <code>dashboard-inversiones</code>.</li>
+            <li><em>Permissions</em> → <em>Repository permissions</em> → <strong>Contents: Read and write</strong>. Nada más.</li>
+            <li>Genera el token, cópialo y pégalo aquí.</li>
+          </ol>
+          <div class="form-group">
+            <label for="cloudTokenInput">Token de GitHub</label>
+            <input type="password" id="cloudTokenInput" class="form-control" placeholder="github_pat_..." autocomplete="off">
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-danger" id="cloudDisconnectBtn" onclick="disconnectCloud()" style="display:none;">Desconectar</button>
+          <button type="button" class="btn btn-secondary" onclick="closeCloudModal()">Cerrar</button>
+          <button type="submit" class="btn btn-primary"><i class="fa-solid fa-cloud-arrow-up"></i> Guardar y subir</button>
         </div>
       </form>
     </div>
@@ -1926,18 +1968,377 @@
       return { key, obj: JSON.parse(new TextDecoder().decode(plain)) };
     }
 
+    // ================= NUBE: rama `datos` de este repositorio en GitHub =================
+    // El fichero remoto guarda SOLO el envoltorio cifrado. Leerlo no necesita nada
+    // (el contenido es ilegible sin el PIN). Escribirlo necesita un token de GitHub
+    // con permiso de escritura en este repo; ese token viaja DENTRO de los datos
+    // cifrados, así que en cualquier otro dispositivo basta con poner el PIN.
+    // (Antes se usaba npoint: lo bloquean algunas redes de empresa y aceptaba
+    // escrituras de cualquiera que tuviera la URL.)
+    const CLOUD = { owner: '7pmorillas-ship-it', repo: 'dashboard-inversiones', branch: 'datos', path: 'cartera.enc.json' };
+    const CLOUD_API = `https://api.github.com/repos/${CLOUD.owner}/${CLOUD.repo}`;
+    const CLOUD_RAW = `https://raw.githubusercontent.com/${CLOUD.owner}/${CLOUD.repo}/${CLOUD.branch}/${CLOUD.path}`;
+    const LEGACY_NPOINT_URL = 'https://api.npoint.io/00c7f3df788f252ae701'; // solo lectura, para migrar
+    const CLOUD_BASE_KEY = 'inv_cloud_base_v1';   // último estado sincronizado (cifrado), para fusionar
+    const CLOUD_DIRTY_KEY = 'inv_cloud_dirty_v1'; // hay cambios de este dispositivo sin subir
+    const SYNC_POLL_MS = 60000;
+
+    let cloudToken = '';         // token de GitHub: en memoria y dentro del payload cifrado
+    let authOnlyToken = '';      // para la última subida al desconectar (autentica pero no se guarda)
+    let remoteSha = null;        // versión del fichero remoto que conocemos
+    let lastRemoteCt = null;     // ct del último envoltorio remoto aplicado
+    let baseSnapshot = null;     // payload del último estado sincronizado (fusión a 3 bandas)
+    let pendingIsLegacy = false; // el envoltorio pendiente viene de npoint (hay que migrarlo)
+    let newCloudPending = false; // no hay datos en ningún sitio: el PIN que se ponga es nuevo
+
+    // ---- Identificadores estables de registro (para fusionar cambios de varios dispositivos) ----
+    function newRecordId() {
+      return 'n' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+    }
+    // Los registros antiguos no tienen id: se le da uno determinista (fecha + orden
+    // dentro del día) para que dos dispositivos con los mismos datos coincidan.
+    function ensureRecordIds(list) {
+      if (!Array.isArray(list)) return list;
+      const used = new Set(list.filter(r => r && r.id).map(r => r.id));
+      const seen = {};
+      list.slice().sort((a, b) => String(a.date).localeCompare(String(b.date))).forEach(r => {
+        if (!r || r.id) return;
+        const base = 'r' + String(r.date || '').replace(/-/g, '');
+        let id;
+        do { seen[base] = (seen[base] || 0) + 1; id = base + '_' + seen[base]; } while (used.has(id));
+        used.add(id);
+        r.id = id;
+      });
+      return list;
+    }
+
+    function payloadCore() {
+      const p = { assetsConfig, records, settings: appSettings };
+      if (cloudToken) p.cloud = { token: cloudToken };
+      return JSON.parse(JSON.stringify(p));
+    }
+    function currentPayload() {
+      return Object.assign(payloadCore(), { lastUpdate: new Date().toISOString() });
+    }
+    const stableStr = (o) => JSON.stringify(o === undefined ? null : o);
+
+    // ---- Fusión a 3 bandas: base (último sincronizado), local y remoto ----
+    // Lo que solo cambió en un lado gana; si cambió en los dos, gana este
+    // dispositivo, salvo que uno lo borrase y el otro lo editara (se conserva).
+    function pick3(b, l, r) {
+      const lChanged = stableStr(l) !== stableStr(b);
+      const rChanged = stableStr(r) !== stableStr(b);
+      if (!lChanged) return r;
+      if (!rChanged) return l;
+      if (l === undefined) return r;
+      return l;
+    }
+    function mergeById(base, local, remote) {
+      const toMap = (arr) => { const m = new Map(); (arr || []).forEach(x => { if (x && x.id) m.set(x.id, x); }); return m; };
+      const B = toMap(base), L = toMap(local), R = toMap(remote);
+      const out = [];
+      new Set([...R.keys(), ...L.keys()]).forEach(id => {
+        const v = pick3(B.get(id), L.get(id), R.get(id));
+        if (v) out.push(v);
+      });
+      return out;
+    }
+    function mergeObj(b, l, r) {
+      const out = {};
+      new Set([...Object.keys(b || {}), ...Object.keys(l || {}), ...Object.keys(r || {})]).forEach(k => {
+        const v = pick3((b || {})[k], (l || {})[k], (r || {})[k]);
+        if (v !== undefined) out[k] = v;
+      });
+      return out;
+    }
+    function mergePayloads(base, local, remote) {
+      const b = base || {};
+      [b, local, remote].forEach(p => { if (p && p.records) ensureRecordIds(p.records); });
+      const merged = {
+        assetsConfig: mergeById(b.assetsConfig, local.assetsConfig, remote.assetsConfig),
+        records: mergeById(b.records, local.records, remote.records),
+        settings: mergeObj(b.settings, local.settings, remote.settings)
+      };
+      const cloud = pick3(b.cloud, local.cloud, remote.cloud);
+      if (cloud) merged.cloud = cloud;
+      return merged;
+    }
+
     function applyCloudPayload(payload) {
       if (!payload) return;
-      if (payload.records && Array.isArray(payload.records)) { records = payload.records; sortRecords(); }
+      if (payload.records && Array.isArray(payload.records)) { records = payload.records; sortRecords(); ensureRecordIds(records); }
       if (payload.assetsConfig && Array.isArray(payload.assetsConfig)) assetsConfig = payload.assetsConfig;
       if (payload.settings && typeof payload.settings === 'object') {
         appSettings = Object.assign({}, appSettings, payload.settings);
         localStorage.setItem('inversiones_settings_v1', JSON.stringify(appSettings));
       }
+      if (payload.cloud && payload.cloud.token) cloudToken = payload.cloud.token;
       normalizeConfig();
       localStorage.setItem('inversiones_assets_v8', JSON.stringify(assetsConfig));
       localStorage.setItem('inversiones_records_v8', JSON.stringify(records));
     }
+
+    function setBase(env, payload) {
+      baseSnapshot = JSON.parse(JSON.stringify(payload));
+      delete baseSnapshot.lastUpdate;
+      try { localStorage.setItem(CLOUD_BASE_KEY, JSON.stringify(env)); } catch (e) { }
+    }
+
+    // Descifra con la clave en memoria; si el envoltorio usa otra sal (otro PIN o
+    // un PIN cambiado), prueba a derivarla de nuevo con el PIN de esta sesión.
+    async function decryptWithCurrentKey(env) {
+      const sameKey = cryptoKey && env.salt === cloudSalt && (env.iter || CLOUD_KDF_ITER) === cloudIter;
+      if (sameKey) {
+        const plain = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: b64ToBytes(env.iv) }, cryptoKey, b64ToBytes(env.ct));
+        return JSON.parse(new TextDecoder().decode(plain));
+      }
+      if (!savedPin) throw new Error('falta el PIN');
+      const { key, obj } = await decryptCloud(env, savedPin);
+      cryptoKey = key; cloudSalt = env.salt; cloudIter = env.iter || CLOUD_KDF_ITER;
+      return obj;
+    }
+
+    // ---- Lectura y escritura en GitHub ----
+    function ghHeaders() {
+      const h = { 'Accept': 'application/vnd.github+json' };
+      const t = cloudToken || authOnlyToken;
+      if (t) h['Authorization'] = 'Bearer ' + t;
+      return h;
+    }
+
+    // { env, sha } ; env = null si todavía no hay fichero. Lanza si no hay conexión.
+    async function readRemote() {
+      if (cloudToken) {
+        const res = await fetch(`${CLOUD_API}/contents/${CLOUD.path}?ref=${CLOUD.branch}&t=${Date.now()}`, { headers: ghHeaders(), cache: 'no-store' });
+        if (res.status === 404) return { env: null, sha: null };
+        if (res.ok) {
+          const j = await res.json();
+          const text = j.content
+            ? atob(j.content.replace(/\s/g, ''))
+            : await (await fetch(j.download_url + '?t=' + Date.now(), { cache: 'no-store' })).text();
+          return { env: JSON.parse(text), sha: j.sha };
+        }
+        if (res.status === 401) throw new Error('el token de GitHub no vale o ha caducado');
+        // Otro error (límite de peticiones...): seguimos con la lectura pública
+      }
+      const res = await fetch(`${CLOUD_RAW}?t=${Date.now()}`, { cache: 'no-store' });
+      if (res.status === 404) return { env: null, sha: null };
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      return { env: JSON.parse(await res.text()), sha: null };
+    }
+
+    async function ensureDataBranch() {
+      const head = await fetch(`${CLOUD_API}/branches/${CLOUD.branch}`, { headers: ghHeaders(), cache: 'no-store' });
+      if (head.ok) return true;
+      if (head.status !== 404) return false;
+      const repo = await (await fetch(CLOUD_API, { headers: ghHeaders(), cache: 'no-store' })).json();
+      const ref = await (await fetch(`${CLOUD_API}/git/ref/heads/${repo.default_branch || 'master'}`, { headers: ghHeaders(), cache: 'no-store' })).json();
+      if (!ref || !ref.object) return false;
+      const res = await fetch(`${CLOUD_API}/git/refs`, {
+        method: 'POST',
+        headers: Object.assign({ 'Content-Type': 'application/json' }, ghHeaders()),
+        body: JSON.stringify({ ref: 'refs/heads/' + CLOUD.branch, sha: ref.object.sha })
+      });
+      return res.ok;
+    }
+
+    // { ok, sha } | { conflict } | { error }
+    async function writeRemote(env, sha, retried) {
+      const body = {
+        message: 'Datos cifrados del dashboard (' + new Date().toISOString().slice(0, 16).replace('T', ' ') + ')',
+        content: btoa(JSON.stringify(env)),
+        branch: CLOUD.branch
+      };
+      if (sha) body.sha = sha;
+      const res = await fetch(`${CLOUD_API}/contents/${CLOUD.path}`, {
+        method: 'PUT',
+        headers: Object.assign({ 'Content-Type': 'application/json' }, ghHeaders()),
+        body: JSON.stringify(body)
+      });
+      if (res.ok) {
+        const j = await res.json();
+        return { ok: true, sha: j.content && j.content.sha };
+      }
+      if (res.status === 409 || (res.status === 422 && sha)) return { conflict: true };
+      if (res.status === 422 && !sha) return { conflict: true }; // ya existe: hay que leer su sha
+      if (res.status === 404 && !retried) {
+        if (await ensureDataBranch()) return writeRemote(env, sha, true);
+      }
+      if (res.status === 401) return { error: 'el token de GitHub no vale o ha caducado' };
+      if (res.status === 403 || res.status === 404) return { error: 'el token no tiene permiso de escritura (Contents: Read and write) en ' + CLOUD.repo };
+      return { error: 'HTTP ' + res.status };
+    }
+
+    // ---- Sincronización ----
+    // Todo pasa por una cola para que una subida y una bajada nunca se pisen.
+    let syncChain = Promise.resolve();
+    function queueSync(fn) {
+      const run = syncChain.then(fn, fn);
+      syncChain = run.catch(() => false);
+      return run;
+    }
+
+    let pushTimer = null;
+    function schedulePush() {
+      clearTimeout(pushTimer);
+      pushTimer = setTimeout(() => { pushToCloud(); }, 700);
+    }
+
+    function pushToCloud() { return queueSync(doPush); }
+
+    async function mergeRemoteIntoLocal(env) {
+      let remotePayload;
+      try {
+        remotePayload = await decryptWithCurrentKey(env);
+      } catch (e) {
+        pendingCloud = env; pendingIsLegacy = false; cryptoKey = null;
+        sessionStorage.removeItem(SESSION_PIN_KEY);
+        showLockOverlay('El PIN se ha cambiado en otro dispositivo: introduce el nuevo');
+        throw new Error('PIN distinto en la nube');
+      }
+      const merged = mergePayloads(baseSnapshot, payloadCore(), remotePayload);
+      applyCloudPayload(merged);
+      setBase(env, remotePayload);
+      lastRemoteCt = env.ct;
+      renderAll();
+    }
+
+    async function doPush() {
+      if (!cloudSyncEnabled) return false;
+      if (!cryptoKey) {
+        updateCloudBadgeStatus('error', 'falta el PIN: no se sube nada sin cifrar');
+        return false;
+      }
+      localStorage.setItem(CLOUD_DIRTY_KEY, '1');
+      if (!cloudToken && !authOnlyToken) {
+        saveEnvelopeLocally(await encryptCloud(currentPayload()));
+        updateCloudBadgeStatus('notoken');
+        return false;
+      }
+      updateCloudBadgeStatus('syncing');
+      try {
+        for (let attempt = 0; attempt < 3; attempt++) {
+          const remote = await readRemote();
+          // Otro dispositivo ha guardado algo desde la última vez: se fusiona antes de subir
+          if (remote.env && remote.env.v === 2 && remote.env.ct && remote.env.ct !== lastRemoteCt) {
+            await mergeRemoteIntoLocal(remote.env);
+          }
+          const env = await encryptCloud(currentPayload());
+          saveEnvelopeLocally(env);
+          const res = await writeRemote(env, remote.sha);
+          if (res.conflict) continue;
+          if (!res.ok) {
+            updateCloudBadgeStatus('error', res.error);
+            return false;
+          }
+          remoteSha = res.sha;
+          lastRemoteCt = env.ct;
+          setBase(env, currentPayload());
+          localStorage.removeItem(CLOUD_DIRTY_KEY);
+          pendingIsLegacy = false;
+          updateCloudBadgeStatus('success');
+          return true;
+        }
+        updateCloudBadgeStatus('error', 'la nube cambió varias veces seguidas; se reintentará');
+        return false;
+      } catch (err) {
+        updateCloudBadgeStatus('error', err.message);
+        return false;
+      }
+    }
+
+    // Trae lo que hayan guardado otros dispositivos. Sin modales abiertos, para
+    // no cambiar los datos mientras escribes.
+    function pullFromCloud(force) {
+      return queueSync(async () => {
+        if (!cloudSyncEnabled || !isUnlocked || !cryptoKey) return false;
+        if (!force && document.querySelector('.modal-overlay.active')) return false;
+        try {
+          const remote = await readRemote();
+          if (remote.sha) remoteSha = remote.sha;
+          const changed = remote.env && remote.env.v === 2 && remote.env.ct && remote.env.ct !== lastRemoteCt;
+          if (changed) {
+            await mergeRemoteIntoLocal(remote.env);
+            updateCloudBadgeStatus(cloudToken ? 'success' : 'notoken');
+          }
+          const localDiffers = stableStr(payloadCore()) !== stableStr(baseSnapshot);
+          if (cloudToken && (localStorage.getItem(CLOUD_DIRTY_KEY) || (changed && localDiffers))) schedulePush();
+          return changed;
+        } catch (e) {
+          console.warn('No se pudo comprobar la nube:', e.message);
+          return false;
+        }
+      });
+    }
+
+    // Tras descifrar lo que hay en la nube: se aplica, y si este dispositivo tenía
+    // cambios sin subir (sin conexión), se fusionan en vez de perderlos.
+    async function acceptRemotePayload(obj, env, fromLegacy) {
+      const dirty = !!localStorage.getItem(CLOUD_DIRTY_KEY);
+      let merged = obj;
+      if (dirty) {
+        let base = null;
+        try {
+          const baseEnv = JSON.parse(localStorage.getItem(CLOUD_BASE_KEY) || 'null');
+          if (baseEnv && baseEnv.v === 2) base = await decryptWithCurrentKey(baseEnv);
+        } catch (e) { base = null; }
+        merged = mergePayloads(base, payloadCore(), obj);
+      }
+      applyCloudPayload(merged);
+      if (!fromLegacy) {
+        setBase(env, obj);
+        lastRemoteCt = env.ct;
+      }
+      if (fromLegacy || dirty) schedulePush();
+    }
+
+    function updateCloudBadgeStatus(state, msg) {
+      const badge = document.getElementById('cloudStatusBadge');
+      if (!badge) return;
+      badge.onclick = null;
+      badge.style.cursor = '';
+      if (!cloudSyncEnabled) {
+        badge.innerText = '⚪ Guardado Local';
+        badge.className = 'badge badge-neutral';
+        return;
+      }
+      if (state === 'syncing') {
+        badge.innerText = '🔄 Guardando...';
+        badge.className = 'badge badge-warning';
+      } else if (state === 'success') {
+        badge.innerText = '🟢 Nube sincronizada';
+        badge.className = 'badge badge-success';
+      } else if (state === 'notoken') {
+        badge.innerText = '🟡 Conecta GitHub para guardar en la nube';
+        badge.className = 'badge badge-warning';
+        badge.style.cursor = 'pointer';
+        badge.onclick = openCloudModal;
+      } else if (state === 'empty') {
+        badge.innerText = '⚪ Nube vacía';
+        badge.className = 'badge badge-neutral';
+      } else if (state === 'error') {
+        badge.innerText = '⚠️ Error nube' + (msg ? ': ' + msg : '');
+        badge.className = 'badge badge-danger';
+        badge.title = msg || '';
+        if (msg) console.warn('Cloud Sync Error:', msg);
+      } else {
+        badge.innerText = '🟢 Nube activa';
+        badge.className = 'badge badge-success';
+      }
+      updateCloudModalStatus();
+    }
+
+    // Init App
+    document.addEventListener('DOMContentLoaded', async () => {
+      loadData();
+      renderAll();
+      if (cloudSyncEnabled) {
+        await fetchFromCloud();
+      }
+      setInterval(() => pullFromCloud(false), SYNC_POLL_MS);
+      window.addEventListener('focus', () => pullFromCloud(false));
+      document.addEventListener('visibilitychange', () => { if (!document.hidden) pullFromCloud(false); });
+    });
 
     function showLockOverlay(message) {
       const overlay = document.getElementById('pinLockOverlay');
@@ -1964,23 +2365,17 @@
       localStorage.setItem('inversiones_pin_v1', 'guardado');
       const chk = document.getElementById('rememberDeviceCheckbox');
       if (chk && chk.checked) sessionStorage.setItem(SESSION_PIN_KEY, pin);
-      else sessionStorage.removeItem(SESSION_PIN_KEY);
       const errBox = document.getElementById('pinUnlockError');
       if (errBox) errBox.style.display = 'none';
       const inp = document.getElementById('pinInputUnlock');
       if (inp) inp.value = '';
       hideLockOverlay();
       renderAll();
-    }
-
-    // Init App
-    document.addEventListener('DOMContentLoaded', async () => {
-      loadData();
-      renderAll();
-      if (cloudSyncEnabled) {
-        await fetchFromCloud();
+      if (cloudSyncEnabled && !cloudToken) {
+        updateCloudBadgeStatus('notoken');
+        setTimeout(openCloudModal, 300);
       }
-    });
+    }
 
     async function unlockWithPin(e) {
       e.preventDefault();
@@ -1988,40 +2383,42 @@
       const errBox = document.getElementById('pinUnlockError');
       if (!inputPin) return;
 
-      // 1) El JSON remoto ya esta cifrado: el PIN tiene que descifrarlo
+      // 1) Hay datos cifrados (nube, npoint antiguo o copia local): el PIN tiene que abrirlos
       if (pendingCloud) {
         try {
-          const { key, obj } = await decryptCloud(pendingCloud, inputPin);
+          const env = pendingCloud;
+          const { key, obj } = await decryptCloud(env, inputPin);
           cryptoKey = key;
-          cloudSalt = pendingCloud.salt;
-          cloudIter = pendingCloud.iter || CLOUD_KDF_ITER;
-          applyCloudPayload(obj);
+          cloudSalt = env.salt;
+          cloudIter = env.iter || CLOUD_KDF_ITER;
+          savedPin = inputPin;
           pendingCloud = null;
+          await acceptRemotePayload(obj, env, pendingIsLegacy);
           finishUnlock(inputPin);
+          updateCloudBadgeStatus(cloudToken ? 'success' : 'notoken');
         } catch (err) {
           if (errBox) errBox.style.display = 'block';
         }
         return;
       }
 
-      // 2) Migracion: los datos remotos estaban en claro, este PIN los cifra
-      if (migrationPending) {
+      // 2) Migración: datos antiguos en claro (o nada en ningún sitio): este PIN los cifra
+      if (migrationPending || newCloudPending) {
         if (inputPin.length < 6) {
           const p = document.querySelector('#pinLockOverlay p');
-          if (p) p.innerText = 'El PIN debe tener al menos 6 caracteres. No se puede perder.';
+          if (p) p.innerText = 'El PIN debe tener al menos 6 caracteres. Apúntalo: sin él no se pueden recuperar los datos.';
           return;
         }
         const { key, salt } = await deriveCloudKey(inputPin, null, CLOUD_KDF_ITER);
         cryptoKey = key; cloudSalt = salt; cloudIter = CLOUD_KDF_ITER;
         migrationPending = false;
+        newCloudPending = false;
         finishUnlock(inputPin);
-        const ok = await pushToCloud();
-        if (ok) alert('Datos cifrados y guardados en la nube.\n\nApunta este PIN: sin el, tus datos no se pueden recuperar.');
-        else alert('No se pudo cifrar en la nube. Revisa el estado de sincronizacion y vuelve a intentarlo.');
+        if (cloudToken) pushToCloud();
         return;
       }
 
-      // 3) Sin conexion a la nube: el PIN solo cifra el guardado local
+      // 3) Sin conexión a la nube: el PIN solo cifra el guardado local
       const { key, salt } = await deriveCloudKey(inputPin, cloudSalt, cloudIter);
       cryptoKey = key; cloudSalt = salt;
       finishUnlock(inputPin);
@@ -2052,17 +2449,69 @@
       const { key, salt } = await deriveCloudKey(p1, null, CLOUD_KDF_ITER);
       cryptoKey = key; cloudSalt = salt; cloudIter = CLOUD_KDF_ITER;
       savedPin = p1;
+      if (sessionStorage.getItem(SESSION_PIN_KEY)) sessionStorage.setItem(SESSION_PIN_KEY, p1);
       localStorage.setItem('inversiones_pin_v1', 'guardado');
       closePinModal();
       const ok = await pushToCloud();
       alert(ok
-        ? "PIN guardado y datos re-cifrados en la nube.\n\nSi olvidas este PIN, los datos no se pueden recuperar."
-        : "PIN aplicado en este navegador, pero no se pudo guardar en la nube. Revisa la sincronizacion.");
+        ? "PIN cambiado y datos re-cifrados en la nube.\n\nEn los demás dispositivos te pedirá el PIN nuevo. Si lo olvidas, los datos no se pueden recuperar."
+        : "PIN aplicado en este navegador, pero no se pudo guardar en la nube. Revisa la sincronización.");
     }
 
     function removePinConfig() {
       alert("Con los datos cifrados ya no se puede quitar el PIN: sin el, los datos serian ilegibles.\n\nUsa 'Cambiar PIN' si quieres otro.");
       closePinModal();
+    }
+
+    // ---- Conexión con GitHub (una vez; luego viaja cifrada a todos tus dispositivos) ----
+    function openCloudModal() {
+      const inp = document.getElementById('cloudTokenInput');
+      if (inp) inp.value = '';
+      updateCloudModalStatus();
+      document.getElementById('modalCloud').classList.add('active');
+    }
+    function closeCloudModal() {
+      document.getElementById('modalCloud').classList.remove('active');
+    }
+    function updateCloudModalStatus() {
+      const el = document.getElementById('cloudModalStatus');
+      if (!el) return;
+      el.innerHTML = cloudToken
+        ? `<span class="text-success" style="font-weight:700;">✔ Conectado.</span> Los cambios se guardan solos en la rama <code>${CLOUD.branch}</code> de <code>${CLOUD.repo}</code> y los demás dispositivos los ven en menos de un minuto.`
+        : '<span style="color:#b45309; font-weight:700;">Sin conectar.</span> Ahora mismo los cambios solo se guardan en este navegador.';
+      const btn = document.getElementById('cloudDisconnectBtn');
+      if (btn) btn.style.display = cloudToken ? '' : 'none';
+    }
+    async function saveCloudToken(e) {
+      e.preventDefault();
+      if (!isUnlocked || !cryptoKey) { alert('Desbloquea primero con tu PIN.'); return; }
+      const token = document.getElementById('cloudTokenInput').value.trim();
+      if (!token) return;
+      const previous = cloudToken;
+      cloudToken = token;
+      const status = document.getElementById('cloudModalStatus');
+      if (status) status.innerText = 'Comprobando y guardando…';
+      const ok = await pushToCloud();
+      if (ok) {
+        updateCloudModalStatus();
+        alert('¡Listo! Tus datos están en la nube.\n\nEn otro dispositivo solo tendrás que abrir la web y poner el PIN.');
+        closeCloudModal();
+      } else {
+        cloudToken = previous;
+        const badge = document.getElementById('cloudStatusBadge');
+        alert('No se pudo guardar con ese token.\n\n' + (badge ? badge.title || badge.innerText : '') +
+          '\n\nRevisa que tenga acceso al repositorio ' + CLOUD.repo + ' con permiso "Contents: Read and write".');
+        updateCloudModalStatus();
+      }
+    }
+    async function disconnectCloud() {
+      if (!confirm('Se quitará el token de GitHub de tus datos. Hasta que lo vuelvas a conectar, los cambios solo se guardarán en cada navegador. ¿Seguir?')) return;
+      authOnlyToken = cloudToken;
+      cloudToken = '';
+      await pushToCloud(); // la nube se queda sin el token
+      authOnlyToken = '';
+      updateCloudBadgeStatus('notoken');
+      updateCloudModalStatus();
     }
 
     let privacyModeActive = false;
@@ -2071,13 +2520,11 @@
       document.body.classList.toggle('privacy-mode', privacyModeActive);
       const btn = document.getElementById('privacyToggleBtn');
       if (btn) {
-        btn.innerHTML = privacyModeActive 
-          ? '<i class="fa-solid fa-eye"></i> Ver Saldos' 
+        btn.innerHTML = privacyModeActive
+          ? '<i class="fa-solid fa-eye"></i> Ver Saldos'
           : '<i class="fa-solid fa-eye-slash"></i> Ocultar Saldos';
       }
     }
-
-    const DEFAULT_CLOUD_URL = 'https://api.npoint.io/00c7f3df788f252ae701';
 
     function loadData() {
       const savedSync = localStorage.getItem('inversiones_cloud_sync_v1');
@@ -2088,7 +2535,7 @@
         localStorage.setItem('inversiones_cloud_sync_v1', 'true');
       }
       updateCloudToggleButton();
-      
+
       const savedAssets = localStorage.getItem('inversiones_assets_v8');
       if (savedAssets) {
         try { assetsConfig = JSON.parse(savedAssets); } catch (e) { assetsConfig = JSON.parse(JSON.stringify(DEFAULT_ASSETS)); }
@@ -2100,8 +2547,8 @@
 
       const savedRecords = localStorage.getItem('inversiones_records_v8');
       if (savedRecords) {
-        try { 
-          records = JSON.parse(savedRecords); 
+        try {
+          records = JSON.parse(savedRecords);
           if (records.length < DEFAULT_RECORDS.length) {
             records = JSON.parse(JSON.stringify(DEFAULT_RECORDS));
           }
@@ -2110,41 +2557,19 @@
         records = JSON.parse(JSON.stringify(DEFAULT_RECORDS));
       }
       sortRecords();
+      ensureRecordIds(records);
 
       updateCloudBadgeStatus();
     }
 
+    // Cada cambio se guarda en el navegador al momento y en la nube a los pocos
+    // décimos de segundo (agrupando cambios seguidos).
     function saveData() {
+      ensureRecordIds(records);
       localStorage.setItem('inversiones_assets_v8', JSON.stringify(assetsConfig));
       localStorage.setItem('inversiones_records_v8', JSON.stringify(records));
-      if (cloudSyncEnabled) {
-        pushToCloud();
-      }
-    }
-
-    // Universal Cloud Sync Engine
-    function updateCloudBadgeStatus(state, msg) {
-      const badge = document.getElementById('cloudStatusBadge');
-      if (!badge) return;
-      if (!cloudSyncEnabled) {
-        badge.innerText = '⚪ Guardado Local';
-        badge.className = 'badge badge-neutral';
-        return;
-      }
-      if (state === 'syncing') {
-        badge.innerText = '🔄 Guardando...';
-        badge.className = 'badge badge-warning';
-      } else if (state === 'success') {
-        badge.innerText = '🟢 Nube Sincronizada';
-        badge.className = 'badge badge-success';
-      } else if (state === 'error') {
-        badge.innerText = '⚠️ Error Nube';
-        badge.className = 'badge badge-danger';
-        if (msg) console.warn("Cloud Sync Error:", msg);
-      } else {
-        badge.innerText = '🟢 Nube Activa';
-        badge.className = 'badge badge-success';
-      }
+      if (isUnlocked) localStorage.setItem(CLOUD_DIRTY_KEY, '1');
+      if (cloudSyncEnabled && isUnlocked) schedulePush();
     }
 
     function toggleCloudSync() {
@@ -2176,123 +2601,120 @@
         alert("La nube está inactiva. Actívala primero.");
         return;
       }
-      updateCloudBadgeStatus('syncing');
-      const pulled = await fetchFromCloud();
-      const pushed = await pushToCloud();
-      renderAll();
-      if (pulled || pushed) {
-        alert("¡Recarga y sincronización manual completadas con éxito!");
+      if (!isUnlocked) {
+        await fetchFromCloud();
+        return;
       }
+      updateCloudBadgeStatus('syncing');
+      await pullFromCloud(true);
+      const pushed = cloudToken ? await pushToCloud() : false;
+      renderAll();
+      if (!cloudToken) openCloudModal();
+      else if (pushed) alert("¡Sincronizado con la nube!");
     }
 
-    async function pushToCloud() {
-      if (!cloudSyncEnabled) return false;
-      if (!cryptoKey) {
-        updateCloudBadgeStatus('error', 'falta el PIN: no se sube nada sin cifrar');
-        return false;
-      }
-      updateCloudBadgeStatus('syncing');
+    function openLocalCopy(message) {
+      const last = localStorage.getItem(CLOUD_LAST_KEY);
+      if (!last) return false;
       try {
-        const payloadObj = { assetsConfig, records, settings: appSettings, lastUpdate: new Date().toISOString() };
-        const envelope = await encryptCloud(payloadObj);
-        saveEnvelopeLocally(envelope);
-
-        const res = await fetch(DEFAULT_CLOUD_URL, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(envelope)
-        });
-
-        if (res.ok) {
-          updateCloudBadgeStatus('success');
+        const env = JSON.parse(last);
+        if (env && env.v === 2 && env.ct) {
+          pendingCloud = env;
+          pendingIsLegacy = true; // al abrirla se sube a la nube nueva
+          cloudSalt = env.salt;
+          cloudIter = env.iter || CLOUD_KDF_ITER;
+          showLockOverlay(message);
           return true;
-        } else {
-          updateCloudBadgeStatus('error', `HTTP ${res.status}`);
-          return false;
         }
-      } catch (err) {
-        updateCloudBadgeStatus('error', err.message);
-        return false;
+      } catch (e) { /* copia local corrupta */ }
+      return false;
+    }
+
+    // Recibe un envoltorio cifrado: lo abre con el PIN de la sesión o pide el PIN.
+    async function receiveEnvelope(env, fromLegacy) {
+      pendingCloud = env;
+      pendingIsLegacy = !!fromLegacy;
+      saveEnvelopeLocally(env);
+      cloudSalt = env.salt;
+      cloudIter = env.iter || CLOUD_KDF_ITER;
+      const pinSesion = sessionStorage.getItem(SESSION_PIN_KEY);
+      if (pinSesion) {
+        try {
+          const { key, obj } = await decryptCloud(env, pinSesion);
+          cryptoKey = key;
+          savedPin = pinSesion;
+          pendingCloud = null;
+          await acceptRemotePayload(obj, env, fromLegacy);
+          finishUnlock(pinSesion);
+          updateCloudBadgeStatus(cloudToken ? 'success' : 'notoken');
+          return true;
+        } catch (e) {
+          sessionStorage.removeItem(SESSION_PIN_KEY);
+        }
       }
+      showLockOverlay(fromLegacy
+        ? 'Introduce tu PIN: tus datos se pasarán a la nube nueva'
+        : 'Introduce tu PIN para descifrar tu cartera');
+      updateCloudBadgeStatus('success');
+      return false;
     }
 
     async function fetchFromCloud() {
       if (!cloudSyncEnabled) return false;
+      let remote;
       try {
-        const response = await fetch(DEFAULT_CLOUD_URL + '?t=' + Date.now());
-        if (!response.ok) {
-          updateCloudBadgeStatus('error', `HTTP ${response.status}`);
-          return false;
-        }
-        const data = await response.json();
-
-        // --- Formato cifrado (v2) ---
-        if (data && data.v === 2 && data.ct) {
-          pendingCloud = data;
-          saveEnvelopeLocally(data);
-          cloudSalt = data.salt;
-          cloudIter = data.iter || CLOUD_KDF_ITER;
-          const pinSesion = sessionStorage.getItem(SESSION_PIN_KEY);
-          if (pinSesion) {
-            try {
-              const { key, obj } = await decryptCloud(data, pinSesion);
-              cryptoKey = key;
-              savedPin = pinSesion;
-              isUnlocked = true;
-              applyCloudPayload(obj);
-              pendingCloud = null;
-              sessionStorage.setItem(SESSION_PIN_KEY, pinSesion);
-              hideLockOverlay();
-              updateCloudBadgeStatus('success');
-              renderAll();
-              return true;
-            } catch (e) {
-              sessionStorage.removeItem(SESSION_PIN_KEY);
-            }
-          }
-          showLockOverlay('Introduce tu PIN para descifrar tu cartera');
-          updateCloudBadgeStatus('success');
-          return false;
-        }
-
-        // --- Formato antiguo en claro: hay que cifrarlo ---
-        const payload = data.data || data.record || data.payloadObj || data;
-        if (payload && payload.records && Array.isArray(payload.records)) {
-          applyCloudPayload(payload);
-          migrationPending = true;
-          showLockOverlay('Elige un PIN para cifrar tus datos (minimo 6 caracteres). No se puede perder.');
-          updateCloudBadgeStatus('error', 'sin cifrar');
-          return false;
-        }
+        remote = await readRemote();
       } catch (err) {
-        // Nivel 1: si la nube falla o alguien la ha vaciado, tiramos de la copia local
-        const last = localStorage.getItem(CLOUD_LAST_KEY);
-        if (last) {
-          try {
-            const env = JSON.parse(last);
-            if (env && env.v === 2) {
-              pendingCloud = env;
-              cloudSalt = env.salt;
-              cloudIter = env.iter || CLOUD_KDF_ITER;
-              showLockOverlay('Sin conexion con la nube: introduce tu PIN para abrir la ultima copia local');
-              updateCloudBadgeStatus('error', 'offline: copia local');
-              return false;
-            }
-          } catch (e) { /* copia local corrupta: seguimos */ }
+        if (openLocalCopy('Sin conexión con la nube: introduce tu PIN para abrir la última copia de este navegador')) {
+          updateCloudBadgeStatus('error', 'sin conexión: copia local');
+          return false;
         }
         updateCloudBadgeStatus('error', err.message);
         return false;
       }
+
+      if (remote.env && remote.env.v === 2 && remote.env.ct) {
+        remoteSha = remote.sha;
+        return receiveEnvelope(remote.env, false);
+      }
+
+      // La nube nueva está vacía: probar la antigua (npoint) para migrar
+      try {
+        const res = await fetch(LEGACY_NPOINT_URL + '?t=' + Date.now(), { cache: 'no-store' });
+        if (res.ok) {
+          const data = await res.json();
+          if (data && data.v === 2 && data.ct) return receiveEnvelope(data, true);
+          const payload = data && (data.data || data.record || data.payloadObj || data);
+          if (payload && payload.records && Array.isArray(payload.records)) {
+            applyCloudPayload(payload);
+            migrationPending = true;
+            showLockOverlay('Elige un PIN para cifrar tus datos (mínimo 6 caracteres). No se puede perder.');
+            updateCloudBadgeStatus('error', 'sin cifrar');
+            return false;
+          }
+        }
+      } catch (e) { /* npoint caído o bloqueado por la red: seguimos */ }
+
+      if (openLocalCopy('Introduce tu PIN para abrir los datos de este navegador y subirlos a la nube')) {
+        updateCloudBadgeStatus('empty');
+        return false;
+      }
+
+      newCloudPending = true;
+      showLockOverlay('Todavía no hay datos en la nube. Elige un PIN (mínimo 6 caracteres) para cifrarlos; después podrás cargar tu backup.');
+      updateCloudBadgeStatus('empty');
       return false;
     }
 
-    // ===== Nivel 1: copias de seguridad (no depender de que npoint siga intacto) =====
+    // ===== Copias de seguridad (no depender solo de la nube) =====
     function saveEnvelopeLocally(envelope) {
       try {
         if (!envelope || envelope.v !== 2) return;
         const hist = JSON.parse(localStorage.getItem(CLOUD_HISTORY_KEY) || '[]');
-        hist.unshift({ ts: new Date().toISOString(), env: envelope });
-        localStorage.setItem(CLOUD_HISTORY_KEY, JSON.stringify(hist.slice(0, CLOUD_HISTORY_MAX)));
+        if (!hist.length || hist[0].env.ct !== envelope.ct) {
+          hist.unshift({ ts: new Date().toISOString(), env: envelope });
+          localStorage.setItem(CLOUD_HISTORY_KEY, JSON.stringify(hist.slice(0, CLOUD_HISTORY_MAX)));
+        }
         localStorage.setItem(CLOUD_LAST_KEY, JSON.stringify(envelope));
       } catch (e) {
         console.warn('no se pudo guardar la copia local:', e);
@@ -2318,6 +2740,8 @@
       setTimeout(() => URL.revokeObjectURL(a.href), 1000);
     }
 
+    // Restaurar una copia cifrada: se abre con el PIN actual y sus datos pasan a
+    // ser los de la nube (se suben cifrados con el PIN de esta sesión).
     async function restoreCloudBackup(input) {
       const file = input.files && input.files[0];
       if (!file) return;
@@ -2328,21 +2752,29 @@
           input.value = '';
           return;
         }
-        if (!confirm('Se reemplazaran los datos de la nube por esta copia. Continuar?')) {
+        if (!isUnlocked || !savedPin) {
+          alert('Desbloquea primero la web con tu PIN y vuelve a intentarlo.');
           input.value = '';
           return;
         }
-        const res = await fetch(DEFAULT_CLOUD_URL, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(env)
-        });
-        if (res.ok) {
-          saveEnvelopeLocally(env);
-          alert('Copia restaurada. Recarga la pagina e introduce tu PIN.');
-        } else {
-          alert('No se pudo restaurar (HTTP ' + res.status + ').');
+        let obj;
+        try {
+          obj = (await decryptCloud(env, savedPin)).obj;
+        } catch (e) {
+          alert('Esa copia está cifrada con otro PIN: no se puede abrir con el actual.');
+          input.value = '';
+          return;
         }
+        if (!confirm('Se reemplazarán tus datos por los de esta copia (' + ((obj.records || []).length) + ' registros). ¿Continuar?')) {
+          input.value = '';
+          return;
+        }
+        const keepToken = cloudToken;
+        applyCloudPayload(obj);
+        if (!cloudToken) cloudToken = keepToken;
+        saveData();
+        renderAll();
+        alert(cloudToken ? 'Copia restaurada y subiéndose a la nube.' : 'Copia restaurada en este navegador. Conecta GitHub para subirla a la nube.');
       } catch (e) {
         alert('Error leyendo el fichero: ' + e.message);
       }
@@ -3872,6 +4304,7 @@
       const round2 = (x) => Math.round(x * 100) / 100;
 
       records.push({
+        id: newRecordId(),
         date,
         kind: 'aport',
         aport: round2(funds + crypto),
@@ -4375,6 +4808,7 @@
       }
 
       const newRecord = {
+        id: (editIndex >= 0 && records[editIndex] && records[editIndex].id) ? records[editIndex].id : newRecordId(),
         date: dateVal,
         aport: fundsAport + cryptoAport,
         flows: { myinvestor: fundsAport, crypto: cryptoAport, t212: stockAport },
@@ -4530,12 +4964,15 @@
           loadSettings();
           normalizeConfig();
           sortRecords();
+          ensureRecordIds(records);
           saveData();
           renderAll();
-          alert("¡Copia de seguridad importada correctamente!");
+          alert(`¡Copia importada! ${records.length} registros.` +
+            (cloudToken ? '\n\nSe está guardando en la nube.' : '\n\nConecta GitHub (botón "Nube GitHub") para que se guarde en la nube.'));
         } catch (err) {
           alert("Error al leer el archivo JSON de copia de seguridad.");
         }
+        event.target.value = '';
       };
       reader.readAsText(file);
     }
