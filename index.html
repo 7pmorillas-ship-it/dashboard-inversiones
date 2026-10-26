@@ -417,6 +417,14 @@
       height: 340px;
       width: 100%;
     }
+    /* El dedo arrastra el gráfico; la página se desplaza fuera de él */
+    .chart-container canvas { touch-action: pan-y pinch-zoom; }
+    @media (max-width: 640px) {
+      .chart-container { height: 300px; }
+      .chart-card { padding: 14px 10px; }
+      .chart-header { flex-wrap: wrap; gap: 8px; }
+      .chart-header .btn { padding: 5px 9px; font-size: 12px; }
+    }
 
     /* Asset Allocation Grid */
     .allocation-charts-grid {
@@ -3515,13 +3523,35 @@
       const mm = String(d.getUTCMonth() + 1).padStart(2, '0');
       return `${dd}/${mm}/${String(d.getUTCFullYear()).slice(2)}`;
     };
+    const isNarrow = () => window.matchMedia('(max-width: 640px)').matches;
+
+    // Tooltip pequeño y discreto: solo la serie del punto que tocas.
+    function compactTooltip(callbacks) {
+      const narrow = isNarrow();
+      return {
+        mode: 'nearest',
+        intersect: false,
+        backgroundColor: 'rgba(15, 23, 42, 0.78)',
+        padding: narrow ? 6 : 8,
+        cornerRadius: 6,
+        caretSize: 4,
+        boxWidth: 8, boxHeight: 8, boxPadding: 3,
+        titleFont: { family: 'Outfit', size: narrow ? 10 : 11, weight: '500' },
+        bodyFont: { family: 'Outfit', size: narrow ? 11 : 12, weight: '600' },
+        footerFont: { family: 'Outfit', size: 10, weight: '400' },
+        titleMarginBottom: 2,
+        footerMarginTop: 3,
+        callbacks
+      };
+    }
+
     function timeAxis(xs) {
       const min = xs.length ? xs[0] : 0;
       let max = xs.length ? xs[xs.length - 1] : 1;
       if (max <= min) max = min + 86400000;
       return {
         type: 'linear', min, max,
-        ticks: { color: '#64748b', maxTicksLimit: 8, maxRotation: 0, callback: (v) => xToDateLabel(v) },
+        ticks: { color: '#64748b', maxTicksLimit: isNarrow() ? 4 : 8, maxRotation: 0, font: { size: isNarrow() ? 10 : 12 }, callback: (v) => xToDateLabel(v) },
         grid: { color: '#e2e8f0' }
       };
     }
@@ -3538,7 +3568,7 @@
     function legendWithMemory(chartKey) {
       return {
         position: 'bottom',
-        labels: { color: '#334155', font: { family: 'Outfit', weight: '600' }, usePointStyle: true, pointStyle: 'line', padding: 14 },
+        labels: { color: '#334155', font: { family: 'Outfit', weight: '600', size: isNarrow() ? 10 : 12 }, usePointStyle: true, pointStyle: 'line', boxWidth: isNarrow() ? 14 : 24, padding: isNarrow() ? 8 : 14 },
         onClick: (e, item, legend) => {
           const chart = legend.chart;
           const ds = chart.data.datasets[item.datasetIndex];
@@ -3593,7 +3623,7 @@
         // Tooltip al hacer clic/tocar, no al pasar el ratón: así arrastrar para
         // moverse no pelea con el tooltip (como funcionaba antes).
         events: ['click', 'touchstart', 'mouseout'],
-        interaction: { mode: 'index', intersect: false },
+        interaction: { mode: 'nearest', intersect: false },
         onClick: (event, elements, chart) => {
           if (!elements || elements.length === 0) {
             chart.setActiveElements([]);
@@ -3603,16 +3633,14 @@
         },
         plugins: {
           legend: legendWithMemory(chartKey),
-          tooltip: {
-            mode: 'index',
-            intersect: false,
-            itemSort: (a, b) => b.parsed.y - a.parsed.y,
-            callbacks: {
-              title: (items) => items.length ? fmtDateDisplay(processed[items[0].dataIndex].date) : '',
-              label: (ctx) => ctx.parsed.y === null ? null : `${ctx.dataset.label}: ${labelFmt(ctx.parsed.y)}`,
-              footer: tooltipAportFooter(processed)
+          tooltip: compactTooltip({
+            title: (items) => items.length ? fmtDateDisplay(processed[items[0].dataIndex].date) : '',
+            label: (ctx) => ctx.parsed.y === null ? null : `${ctx.dataset.label}: ${labelFmt(ctx.parsed.y)}`,
+            footer: (items) => {
+              const f = tooltipAportFooter(processed)(items);
+              return Array.isArray(f) ? f[0] : f; // solo la línea corta
             }
-          },
+          }),
           zoom: {
             // Arrastre libre en los dos ejes (los límites anteriores impedían
             // moverse si no se había hecho zoom antes)
@@ -3626,7 +3654,7 @@
             type: 'linear',
             beginAtZero: false,
             grace: '5%',
-            ticks: { color: '#64748b', callback: yTick, maxTicksLimit: 7 },
+            ticks: { color: '#64748b', callback: yTick, maxTicksLimit: isNarrow() ? 5 : 7, font: { size: isNarrow() ? 10 : 12 } },
             grid: { color: '#e2e8f0' }
           }
         }
@@ -4500,15 +4528,14 @@
           responsive: true,
           maintainAspectRatio: false,
           animation: false,
-          interaction: { mode: 'index', intersect: false },
+          events: ['click', 'touchstart', 'mouseout'],
+          interaction: { mode: 'nearest', intersect: false },
           plugins: {
-            legend: { position: 'bottom', labels: { usePointStyle: true, pointStyle: 'line' } },
-            tooltip: {
-              callbacks: {
-                title: (items) => items.length ? xToDateLabel(items[0].parsed.x) : '',
-                label: (ctx) => `${ctx.dataset.label}: ${ctx.parsed.y.toFixed(1).replace('.', ',')}%`
-              }
-            }
+            legend: { position: 'bottom', labels: { usePointStyle: true, pointStyle: 'line', font: { size: isNarrow() ? 10 : 12 } } },
+            tooltip: compactTooltip({
+              title: (items) => items.length ? xToDateLabel(items[0].parsed.x) : '',
+              label: (ctx) => `${ctx.dataset.label}: ${ctx.parsed.y.toFixed(1).replace('.', ',')}%`
+            })
           },
           scales: {
             y: { ticks: { callback: v => v + '%' }, grid: { color: '#e2e8f0' } },
