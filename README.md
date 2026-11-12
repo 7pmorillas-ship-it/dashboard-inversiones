@@ -41,6 +41,7 @@ Abrir el fichero en local con `file://` **no** sincroniza: el navegador bloquea 
 - Aportaciones desglosadas en `record.flows = { myinvestor, crypto, t212 }`. `record.aport` sigue guardándose como suma (`myinvestor + crypto`) para no alterar los benchmarks ni los KPI existentes.
 - Registros antiguos sin `flows`: toda la aportación se atribuye a fondos, y desde el segundo registro se reparte de forma proporcional al peso previo de fondos/cripto.
 - Objetivos con auto-ajuste: al cambiar un `%` el resto se reparte proporcionalmente hasta sumar 100. `locked` fija una fila. `order` guarda el orden de arrastre.
+- En **Objetivos, orden y cuentas** puedes desmarcar **Aportar** para excluir un activo de las sugerencias y fijar su **Mín. compra (€)** (0 = sin mínimo). Si una compra sugerida no llega al mínimo, se redistribuye entre los demás activos incluidos; si ninguno puede recibirla, el importe queda sin asignar. Estas opciones también se guardan en la nube cifrada y en las copias de seguridad.
 - Ajustes locales en `localStorage['inversiones_settings_v1']` y dentro del payload cifrado (`settings`). Compatible hacia atrás: un payload sin `settings` usa los valores por defecto.
 
 ## Aportaciones y correcciones de cálculo (2026-10-26)

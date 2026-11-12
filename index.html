@@ -1256,6 +1256,7 @@
           <button class="btn btn-secondary" onclick="calculateRebalance()"><i class="fa-solid fa-rotate"></i> Recalcular</button>
           <button class="btn btn-primary" onclick="registerRebalanceAport()" title="Abre la aportación con este reparto ya puesto"><i class="fa-solid fa-check"></i> Registrar esta aportación</button>
         </div>
+        <p id="rebalanceNote" class="metric-note" style="margin: 0 0 16px;"></p>
 
         <div class="table-wrapper">
           <table>
@@ -1379,7 +1380,7 @@
           <span class="sum-pill" id="targetSumPill">100,0 %</span>
           <button class="btn-xs" onclick="normalizeTargets()">Normalizar ahora</button>
           <span class="spacer"></span>
-          <span class="text-muted" style="font-size:12px;">El candado fija ese % y lo excluye del reparto</span>
+          <span class="text-muted" style="font-size:12px;">Configura el mínimo de compra y desmarca «Aportar» para excluir activos</span>
         </div>
         <div class="table-wrapper">
           <table>
@@ -1390,6 +1391,8 @@
                 <th>Cuenta</th>
                 <th>ISIN / Ticker</th>
                 <th style="text-align: right;">Objetivo (%)</th>
+                <th style="text-align: right;" title="0 = sin mínimo">Mín. compra (€)</th>
+                <th style="text-align: center;">Aportar</th>
                 <th style="width: 40px; text-align: center;">Fijar</th>
                 <th>Acciones</th>
               </tr>
@@ -1401,7 +1404,7 @@
               <tr style="background: #f8fafc; font-weight: 700;">
                 <td colspan="4">TOTAL OBJETIVO:</td>
                 <td id="totalTargetWeightCell" style="text-align: right;">100,0 %</td>
-                <td colspan="2"></td>
+                <td colspan="4"></td>
               </tr>
             </tfoot>
           </table>
@@ -1560,7 +1563,7 @@
 
       <div class="guide-card">
         <h3><i class="fa-solid fa-wand-magic-sparkles"></i> 2c. Objetivos que se ajustan solos</h3>
-        <p>En <strong>Objetivos &amp; Activos</strong>, cambia un porcentaje y el resto se recoloca proporcionalmente para que el total siga siendo 100 %. Con el candado fijas los que no quieres que se muevan. Arrastrando la fila cambias el orden en el que aparecen en toda la app.</p>
+        <p>En <strong>Objetivos &amp; Activos</strong>, cambia un porcentaje y el resto se recoloca proporcionalmente para que el total siga siendo 100 %. Con el candado fijas los que no quieres que se muevan. Desmarca <strong>Aportar</strong> para no incluir un activo en las sugerencias, o indica su <strong>Mín. compra (€)</strong> (por ejemplo, 100 € para oro u Horos). Si una sugerencia no alcanza ese mínimo, se reparte entre los demás activos incluidos. Arrastrando la fila cambias el orden en el que aparecen en toda la app.</p>
       </div>
 
       <div class="guide-card">
@@ -1919,7 +1922,10 @@
       t212: { name: 'Trading 212', color: '#0ea5e9' },
       crypto: { name: 'Cripto', color: '#f59e0b' }
     };
-    let appSettings = { stockTarget: 0, stockLocked: false, autoTargets: true };
+    let appSettings = {
+      stockTarget: 0, stockLocked: false, autoTargets: true,
+      stockMinInvestment: 0, stockRebalanceEnabled: true
+    };
 
     function assetPillar(a) {
       if (a.pillar) return a.pillar;
@@ -1927,13 +1933,19 @@
       return 'myinvestor';
     }
 
-    // Compatibilidad: rellena pillar/order/locked en configuraciones antiguas.
+    // Compatibilidad: rellena opciones nuevas en configuraciones antiguas.
     function normalizeConfig() {
       assetsConfig.forEach((a, i) => {
         a.pillar = assetPillar(a);
         if (typeof a.order !== 'number') a.order = i;
         if (typeof a.locked !== 'boolean') a.locked = false;
+        const minimum = Number(a.minInvestment);
+        a.minInvestment = Number.isFinite(minimum) ? Math.max(0, Math.round(minimum * 100) / 100) : 0;
+        if (typeof a.rebalanceEnabled !== 'boolean') a.rebalanceEnabled = true;
       });
+      const stockMinimum = Number(appSettings.stockMinInvestment);
+      appSettings.stockMinInvestment = Number.isFinite(stockMinimum) ? Math.max(0, Math.round(stockMinimum * 100) / 100) : 0;
+      if (typeof appSettings.stockRebalanceEnabled !== 'boolean') appSettings.stockRebalanceEnabled = true;
       assetsConfig.sort((x, y) => x.order - y.order);
       assetsConfig.forEach((a, i) => { a.order = i; });
     }
@@ -1950,6 +1962,9 @@
       if (typeof appSettings.stockTarget !== 'number' || isNaN(appSettings.stockTarget)) appSettings.stockTarget = 0;
       if (typeof appSettings.autoTargets !== 'boolean') appSettings.autoTargets = true;
       if (typeof appSettings.stockLocked !== 'boolean') appSettings.stockLocked = false;
+      const stockMinimum = Number(appSettings.stockMinInvestment);
+      appSettings.stockMinInvestment = Number.isFinite(stockMinimum) ? Math.max(0, Math.round(stockMinimum * 100) / 100) : 0;
+      if (typeof appSettings.stockRebalanceEnabled !== 'boolean') appSettings.stockRebalanceEnabled = true;
     }
 
     function saveSettings() {
@@ -4126,6 +4141,38 @@
       persistTargets();
     }
 
+    function setAssetRebalanceEnabled(id, enabled) {
+      const asset = assetsConfig.find(a => a.id === id);
+      if (!asset) return;
+      asset.rebalanceEnabled = enabled;
+      saveData();
+      renderAssetsConfigTable();
+      calculateRebalance();
+    }
+
+    function setAssetMinInvestment(id, value) {
+      const asset = assetsConfig.find(a => a.id === id);
+      if (!asset) return;
+      asset.minInvestment = Math.max(0, Math.round(parseAmount(value) * 100) / 100);
+      saveData();
+      renderAssetsConfigTable();
+      calculateRebalance();
+    }
+
+    function setStockRebalanceEnabled(enabled) {
+      appSettings.stockRebalanceEnabled = enabled;
+      saveSettings();
+      renderAssetsConfigTable();
+      calculateRebalance();
+    }
+
+    function setStockMinInvestment(value) {
+      appSettings.stockMinInvestment = Math.max(0, Math.round(parseAmount(value) * 100) / 100);
+      saveSettings();
+      renderAssetsConfigTable();
+      calculateRebalance();
+    }
+
     function toggleLock(id) {
       const a = assetsConfig.find(x => x.id === id);
       if (!a) return;
@@ -4229,6 +4276,16 @@
             <input type="number" step="0.1" min="0" max="100" class="target-input" value="${target.toFixed(1)}"
                    onmousedown="event.stopPropagation()" onchange="setTargetWeight('${asset.id}', this.value)">
           </td>
+          <td style="text-align: right;">
+            <input type="number" step="0.01" min="0" class="target-input" value="${asset.minInvestment.toFixed(2)}"
+                   aria-label="Inversión mínima para ${asset.name}" title="Mínimo que debe alcanzar la compra sugerida"
+                   onmousedown="event.stopPropagation()" onchange="setAssetMinInvestment('${asset.id}', this.value)">
+          </td>
+          <td style="text-align: center;">
+            <input type="checkbox" aria-label="Incluir ${asset.name} en el rebalanceo" title="Incluir en las aportaciones sugeridas"
+                   ${asset.rebalanceEnabled ? 'checked' : ''}
+                   onmousedown="event.stopPropagation()" onchange="setAssetRebalanceEnabled('${asset.id}', this.checked)">
+          </td>
           <td style="text-align: center;">
             <button class="lock-btn ${asset.locked ? 'on' : ''}" title="Fijar este porcentaje" onclick="toggleLock('${asset.id}')">
               <i class="fa-solid ${asset.locked ? 'fa-lock' : 'fa-lock-open'}"></i>
@@ -4262,6 +4319,16 @@
         <td style="text-align: right;">
           <input type="number" step="0.1" min="0" max="100" class="target-input" value="${stockTarget.toFixed(1)}"
                  onmousedown="event.stopPropagation()" onchange="setStockTarget(this.value)">
+        </td>
+        <td style="text-align: right;">
+          <input type="number" step="0.01" min="0" class="target-input" value="${appSettings.stockMinInvestment.toFixed(2)}"
+                 aria-label="Inversión mínima para Trading 212" title="Mínimo que debe alcanzar la compra sugerida"
+                 onmousedown="event.stopPropagation()" onchange="setStockMinInvestment(this.value)">
+        </td>
+        <td style="text-align: center;">
+          <input type="checkbox" aria-label="Incluir Trading 212 en el rebalanceo" title="Incluir en las aportaciones sugeridas"
+                 ${appSettings.stockRebalanceEnabled ? 'checked' : ''}
+                 onmousedown="event.stopPropagation()" onchange="setStockRebalanceEnabled(this.checked)">
         </td>
         <td style="text-align: center;">
           <button class="lock-btn ${appSettings.stockLocked ? 'on' : ''}" title="Fijar este porcentaje" onclick="toggleStockLock()">
@@ -4342,15 +4409,22 @@
         name: asset.name,
         pillar: assetPillar(asset),
         target: Number(asset.target) || 0,
-        currentVal: Math.max(0, parseFloat(state.assets[asset.id]) || 0)
+        currentVal: Math.max(0, parseFloat(state.assets[asset.id]) || 0),
+        minInvestment: Number(asset.minInvestment) || 0,
+        rebalanceEnabled: asset.rebalanceEnabled !== false,
+        belowMinimum: false
       }));
       rows.push({
         key: '__t212',
         name: 'Trading 212 (acciones)',
         pillar: 't212',
         target: Number(appSettings.stockTarget) || 0,
-        currentVal: Math.max(0, state.stockTotal || 0)
+        currentVal: Math.max(0, state.stockTotal || 0),
+        minInvestment: Number(appSettings.stockMinInvestment) || 0,
+        rebalanceEnabled: appSettings.stockRebalanceEnabled !== false,
+        belowMinimum: false
       });
+      amount = Math.max(0, Math.round((Number(amount) || 0) * 100) / 100);
       const totalNow = state.totalWealth || rows.reduce((s, r) => s + r.currentVal, 0);
       const targetPortfolioTotal = totalNow + amount;
       const targetSum = rows.reduce((s, r) => s + r.target, 0) || 100;
@@ -4358,18 +4432,34 @@
         r.targetVal = targetPortfolioTotal * (r.target / targetSum);
         r.needed = Math.max(0, r.targetVal - r.currentVal);
       });
-      const totalNeeded = rows.reduce((s, r) => s + r.needed, 0);
-      rows.forEach(r => {
-        const raw = totalNeeded > 0 ? (r.needed / totalNeeded) * amount : amount * (r.target / targetSum);
-        r.buy = Math.round(raw * 100) / 100;
-      });
-      // Cuadrar céntimos en la fila con más compra
-      const diff = Math.round((amount - rows.reduce((s, r) => s + r.buy, 0)) * 100) / 100;
-      if (Math.abs(diff) >= 0.01) {
-        const big = rows.reduce((a, b) => (b.buy > a.buy ? b : a), rows[0]);
-        big.buy = Math.round((big.buy + diff) * 100) / 100;
+      let eligible = rows.filter(r => r.rebalanceEnabled);
+      const allocate = candidates => {
+        const totalNeeded = candidates.reduce((s, r) => s + r.needed, 0);
+        const totalWeight = totalNeeded > 0 ? totalNeeded : candidates.reduce((s, r) => s + r.target, 0);
+        const budgetCents = Math.round(amount * 100);
+        let assignedCents = 0;
+        const shares = candidates.map(r => {
+          const weight = totalNeeded > 0 ? r.needed : r.target;
+          const exactCents = totalWeight > 0 ? budgetCents * weight / totalWeight : 0;
+          const cents = Math.floor(exactCents);
+          assignedCents += cents;
+          return { row: r, cents, remainder: exactCents - cents };
+        });
+        const remainingCents = totalWeight > 0 ? budgetCents - assignedCents : 0;
+        shares.slice().sort((a, b) => b.remainder - a.remainder).slice(0, remainingCents)
+          .forEach(share => { share.cents += 1; });
+        shares.forEach(share => { share.row.proposed = share.cents / 100; });
+      };
+      while (eligible.length) {
+        allocate(eligible);
+        const belowMinimum = eligible.filter(r => r.minInvestment > 0 && r.proposed > 0 && r.proposed < r.minInvestment);
+        if (!belowMinimum.length) break;
+        const skip = belowMinimum.reduce((a, b) => b.proposed < a.proposed ? b : a);
+        skip.belowMinimum = true;
+        eligible = eligible.filter(r => r !== skip);
       }
       rows.forEach(r => {
+        r.buy = eligible.includes(r) ? (r.proposed || 0) : 0;
         r.currentWeight = totalNow > 0 ? (r.currentVal / totalNow) * 100 : 0;
         r.newWeight = targetPortfolioTotal > 0 ? ((r.currentVal + r.buy) / targetPortfolioTotal) * 100 : 0;
       });
@@ -4387,15 +4477,28 @@
       const nextAport = input ? (parseFloat(String(input.value).replace(',', '.')) || 0) : 0;
       // Siempre con los saldos más recientes, aunque haya un filtro de fechas puesto
       const rows = rebalanceSplit(nextAport, effectiveStateAt(null));
+      const allocated = rows.reduce((sum, r) => sum + r.buy, 0);
+      const note = document.getElementById('rebalanceNote');
+      if (note) {
+        const unallocated = Math.max(0, Math.round((nextAport - allocated) * 100) / 100);
+        note.textContent = unallocated > 0
+          ? `Se sugieren ${fmtEur(allocated)} de ${fmtEur(nextAport)}. Quedan ${fmtEur(unallocated)} sin asignar por los activos excluidos o sus mínimos de compra.`
+          : 'La aportación completa está asignada respetando los activos incluidos y sus mínimos de compra.';
+      }
 
       rows.forEach(r => {
         const tr = document.createElement('tr');
+        const buyStatus = !r.rebalanceEnabled
+          ? '<div class="text-muted" style="font-size: .75rem;">Excluido de aportaciones</div>'
+          : (r.belowMinimum
+            ? `<div class="text-muted" style="font-size: .75rem;">No alcanza el mínimo de ${fmtEur(r.minInvestment)}</div>`
+            : '');
         tr.innerHTML = `
           <td class="text-bold">${r.name}</td>
           <td>${r.target.toFixed(1)}%</td>
           <td>${fmtEur(r.currentVal)}</td>
           <td>${r.currentWeight.toFixed(1)}%</td>
-          <td class="text-bold ${r.buy > 0 ? 'text-success' : 'text-muted'}">${r.buy > 0 ? '+' : ''}${fmtEur(r.buy)}</td>
+          <td class="text-bold ${r.buy > 0 ? 'text-success' : 'text-muted'}">${r.buy > 0 ? '+' : ''}${fmtEur(r.buy)}${buyStatus}</td>
           <td>${r.newWeight.toFixed(1)}%</td>
         `;
         tbody.appendChild(tr);
@@ -4407,8 +4510,14 @@
       const amount = input ? (parseFloat(String(input.value).replace(',', '.')) || 0) : 0;
       if (!(amount > 0)) { alert('Pon primero cuánto vas a aportar.'); return; }
       const split = {};
-      rebalanceSplit(amount, effectiveStateAt(null)).forEach(r => { if (r.buy > 0) split[r.key] = r.buy; });
-      openQuickModal(split, amount);
+      const rows = rebalanceSplit(amount, effectiveStateAt(null));
+      rows.forEach(r => { if (r.buy > 0) split[r.key] = r.buy; });
+      const allocated = rows.reduce((sum, r) => sum + r.buy, 0);
+      if (!(allocated > 0)) {
+        alert('No hay activos incluidos que alcancen su mínimo de compra para esta aportación.');
+        return;
+      }
+      openQuickModal(split, allocated);
     }
 
     // ================= APORTACIÓN RÁPIDA =================
